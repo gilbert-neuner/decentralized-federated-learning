@@ -14,3 +14,25 @@ def generate_X_Y(n, p, beta_true, SNR = 1):
     epsilon = np.random.normal(0, sigma, n)
     Y = X @ beta_true + epsilon
     return X, Y
+
+def generate_adj_mtx(K = 10, shape = "mesh"):
+    if shape == "mesh":
+        adjacency_matrix = np.ones([K, K], dtype = int)
+    elif shape == "line":
+        adjacency_matrix = np.zeros([K, K], dtype = int)
+        for i in range(K):
+            for j in range(K):
+                if abs(i - j) <= 1:
+                    adjacency_matrix[i, j] = 1
+    elif shape == "ring":
+        adjacency_matrix = generate_adj_mtx(K, shape = "line")
+        adjacency_matrix[0, K - 1] = 1
+        adjacency_matrix[K - 1, 0] = 1
+    elif shape == "star":
+        adjacency_matrix = np.zeros([K, K], dtype = int)
+        for k in range(K):
+            adjacency_matrix[0, k] = 1
+            adjacency_matrix[k, 0] = 1
+            adjacency_matrix[k, k] = 1
+    return adjacency_matrix
+        
