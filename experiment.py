@@ -4,7 +4,7 @@ from communication_network import Communication_Network
 from diagnostic import *
 
 K = 10
-shape = "star"
+shape = "mesh"
 adjacency_matrix = generate_adj_mtx(K, shape)
 
 random.seed(1)
@@ -22,17 +22,14 @@ for k in range(K):
     x, y = generate_X_Y(n, p, beta_true, SNR)
     X.append(x)
     Y.append(y)
-    
-a = {k : 0.5 for k in range(K)}
-b = a
 
-threshold = 10**-0.5 # 10**-0.5
+threshold = 10**-0.5
 
-comm_graph = Communication_Network(adjacency_matrix, beta0, X, Y, a, b, threshold)
+comm_graph = Communication_Network(adjacency_matrix, beta0, X, Y, threshold)
 
-max_step_size = 1 # 1
+max_step_size = 1
 
-comm_graph.run_experiment(n_iter = 100, scheme = "gradients_models_threshold", max_step_size = max_step_size)
+comm_graph.run_experiment(n_iter = 100, scheme = "CG", max_step_size = max_step_size)
 
 comm_graph.comm_graph[0].beta_curr
 
