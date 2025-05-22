@@ -2,6 +2,6 @@ Repository for my PhD research on decentralized federated learning
 
 February: submitted Written Qualifying Exam
 
-Ongoing: rewriting my code in Python (for the WQE I used R)
+Ongoing: rewriting my code in Python (the code for the WQE is in R)
 
-For a summary of what I am currently working on and how the WQE relates to it, see roadmap.pdf
+For the overarching framework, see roadmap.pdf
