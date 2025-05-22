@@ -8,7 +8,8 @@ def generate_beta_true(p, sparsity = 0.05):
         beta_true[beta_support, ] = 1
     return beta_true
 
-def generate_X_Y(n, p, beta_true, SNR = 1):
+def generate_X_Y(n, beta_true, SNR = 1):
+    p = np.shape(beta_true)[0]
     sigma = np.dot(beta_true, beta_true / SNR) ** 0.5
     X = np.random.multivariate_normal(np.zeros(p), np.identity(p), n)
     epsilon = np.random.normal(0, sigma, n)
