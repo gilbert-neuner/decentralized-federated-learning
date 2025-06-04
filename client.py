@@ -1,7 +1,6 @@
-# ACGT BRANCH
-
 import numpy as np
 from numpy import linalg as LA
+import random
 
 class Client:
     """Represent a client."""
@@ -19,7 +18,7 @@ class Client:
         X : np.ndarray
             Matrix of shape (n, p).
         Y : np.ndarray
-            Vector of shape (1, ).
+            Vector of shape (n, ).
 
         Returns
         -------
@@ -242,3 +241,36 @@ class Client:
             self.THRESHOLD((a + b) / 2, threshold)
             self.update_beta_curr()
             self.reset_beta_temp()
+            
+class Adversary(Client):
+    def __init__(self, client_id, neighbors, X, Y, corrupt_fraction):
+        n = np.shape(X)[0]
+        Y[random.sample(range(n), round(n * corrupt_fraction))] *= -1
+        super().__init__(client_id, neighbors, X, Y)
+        
+    def select_step_size(self, scheme, curr_iter, max_step_size, threshold):
+        invphi = (5 ** 0.5 - 1) / 2
+        a = 0
+        b = max_step_size
+
+        while b - a > 1 / (curr_iter + 1):
+            c = b - (b - a) * invphi
+            self.GRADIENT(c)
+            self.THRESHOLD(c, threshold)
+            fc = self.objective_function(threshold)
+            self.reset_beta_temp()
+            
+            d = a + (b - a) * invphi
+            self.GRADIENT(d)
+            self.THRESHOLD(d, threshold)
+            fd = self.objective_function(threshold)
+            self.reset_beta_temp()
+            
+            if fc < fd:
+                b = d
+            else:
+                a = c        
+        self.GRADIENT((a + b) / 2)
+        self.THRESHOLD((a + b) / 2, threshold)
+        self.update_beta_curr()
+        self.reset_beta_temp()

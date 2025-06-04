@@ -1,16 +1,19 @@
 import numpy as np
 from numpy import linalg as LA
-from client import Client
+from client import Client, Adversary
 from generate_data import *
 
 class Communication_Network:
-    def __init__(self, adjacency_matrix, X, Y):
+    def __init__(self, adjacency_matrix, X, Y, which_adversaries, corrupt_fraction):
         self.comm_graph = []
         self.K = np.shape(adjacency_matrix)[0]
         self.p = np.shape(X[0])[1]
         for k in range(self.K):
             neighbors = list(np.where(adjacency_matrix[k, :] == 1)[0])
-            self.comm_graph.append(Client(client_id = k, neighbors = neighbors, X = X[k], Y = Y[k]))
+            if(k in which_adversaries):                
+                self.comm_graph.append(Adversary(client_id = k, neighbors = neighbors, X = X[k], Y = Y[k], corrupt_fraction = corrupt_fraction))
+            else:
+                self.comm_graph.append(Client(client_id = k, neighbors = neighbors, X = X[k], Y = Y[k]))
             
     def BROADCAST(self):
         for i in range(self.K):
@@ -32,25 +35,6 @@ class Communication_Network:
                 displacement *= 5 / LA.norm(displacement)
                 self.comm_graph[k].beta_curr = beta0 + displacement
                 self.comm_graph[k].betas_temp[k] = beta0 + displacement
-        elif(start == "ahead/behind"):
-            if(self.K != 2):
-                raise Exception("Sorry, only works with 2 clients")
-            displacement = np.random.uniform(-1, 1, 100)
-            displacement *= 5 / LA.norm(displacement)
-            self.comm_graph[0].beta_curr = beta0 + displacement
-            self.comm_graph[0].betas_temp[0] = beta0 + displacement
-            self.comm_graph[1].beta_curr = beta0 + 2 * displacement
-            self.comm_graph[1].betas_temp[1] = beta0 + 2 * displacement
-        elif(start == "between"):
-            if(self.K != 2):
-                raise Exception("Sorry, only works with 2 clients")
-            displacement = np.random.uniform(-1, 1, 100)
-            displacement *= 5 / LA.norm(displacement)
-            self.comm_graph[0].beta_curr = beta0 + displacement
-            self.comm_graph[0].betas_temp[0] = beta0 + displacement
-            self.comm_graph[1].beta_curr = beta0 - displacement
-            self.comm_graph[1].betas_temp[1] = beta0 - displacement
-            
     
     def run_algorithm(self, beta0 = None, max_step_size = 1, n_iter = 100, scheme = "G", start = "identical", threshold = 10**-0.5):
         self.initialize_start(start, beta0)
