@@ -2,7 +2,7 @@ from communication_network import Communication_Network
 from diagnostic import *
 from generate_data import *
 
-def grid_search(adjacency_matrix, n = 50, p = 100, n_rep = 3, max_step_size = 1, metric = "rel_norm", n_iter = 100, scheme = "G", seed = 1234, SNR = 2, sparsity = 0.05, start = "identical", beta0 = None, thresholds = 10 ** np.arange(-1, 1.1, 0.5), which_adversaries = [], corrupt_fraction = 1):
+def grid_search(adjacency_matrix, n = 50, p = 100, n_rep = 3, max_step_size = 1, metric = "rel_norm", n_iter = 100, scheme = "G", seed = 1234, SNR = 2, sparsity = 0.05, start = "identical", trust = False, beta0 = None, thresholds = 10 ** np.arange(-1, 1.1, 0.5), which_adversaries = [], corrupt_fraction = 1):
     K = np.shape(adjacency_matrix)[0]
     REL_NORMS = np.zeros(len(thresholds))
     F1S = np.zeros(len(thresholds))
@@ -22,7 +22,7 @@ def grid_search(adjacency_matrix, n = 50, p = 100, n_rep = 3, max_step_size = 1,
         comm_graph = Communication_Network(adjacency_matrix, X, Y, which_adversaries, corrupt_fraction)
         
         for lamb in range(len(thresholds)):
-            comm_graph.run_algorithm(beta0, max_step_size, n_iter, scheme, start, threshold = thresholds[lamb])
+            comm_graph.run_algorithm(beta0, max_step_size, n_iter, scheme, start, threshold = thresholds[lamb], trust = trust)
                 
             rel_norm_out = 0
             confusion_matrix_out = np.zeros([2, 2])
@@ -44,7 +44,7 @@ def grid_search(adjacency_matrix, n = 50, p = 100, n_rep = 3, max_step_size = 1,
         best_index = candidates[np.argmin(REL_NORMS[candidates])]
         return thresholds[best_index]
 
-def run_experiment(adjacency_matrix, n = 50, p = 100, n_rep = 10, max_step_size = 1, n_iter = 100, scheme = "G", seed = 12345, SNR = 2, sparsity = 0.05, start = "identical", beta0 = None, threshold = 10**-0.5, which_adversaries = [], corrupt_fraction = 1):
+def run_experiment(adjacency_matrix, n = 50, p = 100, n_rep = 10, max_step_size = 1, n_iter = 100, scheme = "G", seed = 12345, SNR = 2, sparsity = 0.05, start = "identical", trust = False, beta0 = None, threshold = 10**-0.5, which_adversaries = [], corrupt_fraction = 1):
     K = np.shape(adjacency_matrix)[0]
     REL_NORMS = np.zeros((K, n_rep))
     F1S = np.zeros((K, n_rep))
@@ -62,7 +62,7 @@ def run_experiment(adjacency_matrix, n = 50, p = 100, n_rep = 10, max_step_size 
             
         comm_graph = Communication_Network(adjacency_matrix, X, Y, which_adversaries, corrupt_fraction)
         
-        comm_graph.run_algorithm(beta0, max_step_size, n_iter, scheme, start, threshold)
+        comm_graph.run_algorithm(beta0, max_step_size, n_iter, scheme, start, threshold, trust)
             
         rel_norm_out = 0
         confusion_matrix_out = np.zeros([2, 2])

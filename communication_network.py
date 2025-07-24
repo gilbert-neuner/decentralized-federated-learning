@@ -36,9 +36,17 @@ class Communication_Network:
                 self.comm_graph[k].beta_curr = beta0 + displacement
                 self.comm_graph[k].betas_temp[k] = beta0 + displacement
     
-    def run_algorithm(self, beta0 = None, max_step_size = 1, n_iter = 100, scheme = "G", start = "identical", threshold = 10**-0.5):
+    def run_algorithm(self, beta0 = None, max_step_size = 1, n_iter = 100, scheme = "G", start = "identical", threshold = 10**-0.5, trust = "None"):
         self.initialize_start(start, beta0)
-        for iteration in range(n_iter):
-            self.BROADCAST()
-            for i in range(self.K):
-                self.comm_graph[i].select_step_size(scheme, iteration, max_step_size, threshold)
+        if(trust == "None"):
+            for iteration in range(n_iter):
+                self.BROADCAST()
+                for i in range(self.K):
+                    self.comm_graph[i].select_step_size(scheme, iteration, max_step_size, threshold)
+        else:
+            for iteration in range(n_iter):
+                self.BROADCAST()
+                for i in range(self.K):
+                    self.comm_graph[i].update_trust(trust)
+                    self.comm_graph[i].select_step_size(scheme, iteration, max_step_size, threshold)
+                    self.comm_graph[i].update_betas_old()

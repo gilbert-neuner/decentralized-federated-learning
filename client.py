@@ -3,38 +3,23 @@ from numpy import linalg as LA
 import random
 
 class Client:
-    """Represent a client."""
-    
     def __init__(self, client_id, neighbors, X, Y):
-        """
-        Initialize a client.
-
-        Parameters
-        ----------
-        client_id : int
-            Id of client.
-        neighbors : set
-            List of neighbor id's.
-        X : np.ndarray
-            Matrix of shape (n, p).
-        Y : np.ndarray
-            Vector of shape (n, ).
-
-        Returns
-        -------
-        None.
-
-        """
-        
+        # parameters
         self.client_id = client_id # identifies this client
         self.neighbors = neighbors # client_id of neighbors
         self.X = X # training data
         self.Y = Y # training data
         self.n = np.shape(X)[0]
         self.p = np.shape(X)[1]
+        # optimization
         self.beta_curr = np.zeros(self.p) # current beta
-        self.betas_temp = {neighbor : np.copy(self.beta_curr) for neighbor in neighbors} # workspace
-        self.gradients = {neighbor : np.zeros_like(self.beta_curr) for neighbor in neighbors} # workspace
+        self.betas_temp = {j : np.copy(self.beta_curr) for j in neighbors} # workspace
+        self.gradients = {j : np.zeros_like(self.beta_curr) for j in neighbors} # workspace
+        # trust
+        self.a_trust = {j : 1 for j in neighbors}
+        self.b_trust = {j : 1 for j in neighbors}
+        self.trust = {j : 1 for j in neighbors}
+        self.betas_old = {j : np.copy(self.beta_curr) for j in neighbors}
         
     # HELPER FUNCTIONS
     
@@ -46,25 +31,54 @@ class Client:
             return u
         return u * np.minimum(1, LA.norm(v) / LA.norm(u))
     
+    def cosine_similarity(self, j):
+        gradient_ij = np.transpose(self.X) @ (self.X @ self.betas_temp[j] - self.Y) / self.n
+        return 0.5 * (np.dot(gradient_ij, self.gradients[j]) / (LA.norm(gradient_ij) * LA.norm(self.gradients[j])) + 1)
+    
+    def update_gradient_based_trust(self):
+        for j in list(set(self.neighbors) - set([self.client_id])):
+            if self.cosine_similarity(j) > 0.5:
+                self.a_trust[j] += 1
+            else:
+                self.b_trust[j] += 1
+    
+    def update_model_based_trust(self):
+        for j in list(set(self.neighbors) - set([self.client_id])):
+            if(LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) > LA.norm(self.betas_old[self.client_id] - self.betas_old[j])):
+                self.b_trust[j] += 1
+            else:
+                self.a_trust[j] += 1
+    
+    def update_trust(self, trust = "Both"):
+        if trust == "Gradient":
+            self.update_gradient_based_trust()
+        elif trust == "Model":
+            self.update_model_based_trust()
+        elif trust == "Both":
+            self.update_gradient_based_trust()
+            self.update_model_based_trust()   
+        for j in list(set(self.neighbors) - set([self.client_id])):
+            self.trust[j] = self.a_trust[j] / (self.a_trust[j] + self.b_trust[j])
+    
     # BASIC ACTIONS
     
     def AGGREGATE(self, step_size):
         aggregated_gradient = np.zeros_like(self.gradients[self.client_id])
         for j in self.neighbors:
-            aggregated_gradient += self.normalize_magnitude(self.gradients[j], self.gradients[self.client_id])
+            aggregated_gradient += self.trust[j] * self.normalize_magnitude(self.gradients[j], self.gradients[self.client_id])
         self.betas_temp[self.client_id] -= step_size * aggregated_gradient / len(self.neighbors)
         
     def CONSENSUS(self, step_size):
         aggregated_diff = np.zeros_like(self.betas_temp[self.client_id])
         for j in self.neighbors:
-            aggregated_diff += self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
+            aggregated_diff += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
         self.betas_temp[self.client_id] += step_size * aggregated_diff / len(self.neighbors)
         
     def AGGREGATE_CONSENSUS(self, step_size):
         aggregated_suggestion = np.zeros_like(self.gradients[self.client_id])
         for j in self.neighbors:
-            aggregated_suggestion += -1 * self.normalize_magnitude(self.gradients[j], self.gradients[self.client_id])
-            aggregated_suggestion += self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
+            aggregated_suggestion -= self.trust[j] * self.normalize_magnitude(self.gradients[j], self.gradients[self.client_id])
+            aggregated_suggestion += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
         self.betas_temp[self.client_id] += step_size * aggregated_suggestion / (2 * len(self.neighbors))
         
     def GRADIENT(self, step_size, everybody = False):
@@ -77,7 +91,7 @@ class Client:
     def GRADIENT_CONSENSUS(self, step_size):
         aggregated_suggestion = np.zeros_like(self.betas_temp[self.client_id])
         for j in self.neighbors:
-            aggregated_suggestion += self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
+            aggregated_suggestion += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
         aggregated_suggestion -= len(self.neighbors) * self.gradients[self.client_id]
         self.betas_temp[self.client_id] += aggregated_suggestion / (2 * len(self.neighbors))
         
@@ -94,6 +108,9 @@ class Client:
         
     def update_beta_curr(self):
         self.beta_curr = np.copy(self.betas_temp[self.client_id])
+        
+    def update_betas_old(self):
+        self.betas_old = {j : np.copy(self.betas_temp[j]) for j in self.neighbors}
         
     def select_step_size(self, scheme, curr_iter, max_step_size, threshold):
         invphi = (5 ** 0.5 - 1) / 2
