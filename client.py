@@ -3,23 +3,28 @@ from numpy import linalg as LA
 import random
 
 class Client:
-    def __init__(self, client_id, neighbors, X, Y):
+    # topology_params: client_id, neighbors
+    # data_params: X, Y
+    def __init__(self, topology_params, data_params):
         # parameters
-        self.client_id = client_id # identifies this client
-        self.neighbors = neighbors # client_id of neighbors
-        self.X = X # training data
-        self.Y = Y # training data
-        self.n = np.shape(X)[0]
-        self.p = np.shape(X)[1]
+        self.client_id = topology_params["client_id"] # identifies this client
+        self.neighbors = topology_params["neighbors"] # client_id of neighbors
+        self.X = data_params["X"] # training data
+        self.Y = data_params["Y"] # training data
+        self.n = np.shape(self.X)[0]
+        self.p = np.shape(self.X)[1]
         # optimization
         self.beta_curr = np.zeros(self.p) # current beta
-        self.betas_temp = {j : np.copy(self.beta_curr) for j in neighbors} # workspace
-        self.gradients = {j : np.zeros_like(self.beta_curr) for j in neighbors} # workspace
+        self.betas_temp = {j: np.copy(self.beta_curr) for j in self.neighbors} # workspace
+        self.gradients = {j: np.zeros_like(self.beta_curr) for j in self.neighbors} # workspace
         # trust
-        self.a_trust = {j : 1 for j in neighbors}
-        self.b_trust = {j : 1 for j in neighbors}
-        self.trust = {j : 1 for j in neighbors}
-        self.betas_old = {j : np.copy(self.beta_curr) for j in neighbors}
+        self.a_trust = {j: 1 for j in self.neighbors}
+        self.b_trust = {j: 1 for j in self.neighbors}
+        self.trust = {j: 1 for j in self.neighbors}
+        self.betas_old = {j: np.copy(self.beta_curr) for j in self.neighbors}
+        # history
+        self.gradient_history = {j: [] for j in self.neighbors}
+        self.model_history = {j: [] for j in self.neighbors}
         
     # HELPER FUNCTIONS
     
@@ -35,19 +40,70 @@ class Client:
         gradient_ij = np.transpose(self.X) @ (self.X @ self.betas_temp[j] - self.Y) / self.n
         return 0.5 * (np.dot(gradient_ij, self.gradients[j]) / (LA.norm(gradient_ij) * LA.norm(self.gradients[j])) + 1)
     
-    def update_gradient_based_trust(self):
-        for j in list(set(self.neighbors) - set([self.client_id])):
-            if self.cosine_similarity(j) > 0.5:
-                self.a_trust[j] += 1
-            else:
-                self.b_trust[j] += 1
+    def update_gradient_based_trust(self, accelerated = False):
+        if not accelerated:
+            for j in list(set(self.neighbors) - set([self.client_id])):
+                if self.cosine_similarity(j) > 0.5:
+                    self.a_trust[j] += 1
+                    self.gradient_history[j].append(1)
+                else:
+                    self.b_trust[j] += 1
+                    self.gradient_history[j].append(-1)
+        elif accelerated:
+            for j in list(set(self.neighbors) - set([self.client_id])):
+                if len(self.gradient_history[j]) == 0:
+                    if self.cosine_similarity(j) > 0.5:
+                        self.a_trust[j] += 1
+                        self.gradient_history[j].append(1)
+                    else:
+                        self.b_trust[j] += 1
+                        self.gradient_history[j].append(-1)
+                else:
+                    if self.cosine_similarity(j) > 0.5 and self.gradient_history[j][-1] > 0:
+                        self.a_trust[j] += self.gradient_history[j][-1] + 1
+                        self.gradient_history[j].append(self.gradient_history[j][-1] + 1)
+                    elif self.cosine_similarity(j) > 0.5 and self.gradient_history[j][-1] <= 0:
+                        self.a_trust[j] += 1
+                        self.gradient_history[j].append(1)
+                    elif self.cosine_similarity(j) <= 0.5 and self.gradient_history[j][-1] > 0:
+                        self.b_trust[j] += 1
+                        self.gradient_history[j].append(-1)
+                    elif self.cosine_similarity(j) <= 0.5 and self.gradient_history[j][-1] <= 0:
+                        self.b_trust[j] += -1 * self.gradient_history[j][-1] + 1
+                        self.gradient_history[j].append(self.gradient_history[j][-1] - 1)
     
-    def update_model_based_trust(self):
-        for j in list(set(self.neighbors) - set([self.client_id])):
-            if(LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) > LA.norm(self.betas_old[self.client_id] - self.betas_old[j])):
-                self.b_trust[j] += 1
-            else:
-                self.a_trust[j] += 1
+    def update_model_based_trust(self, accelerated = False):
+        if not accelerated:
+            for j in list(set(self.neighbors) - set([self.client_id])):
+                if(LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) > LA.norm(self.betas_old[self.client_id] - self.betas_old[j])):
+                    self.b_trust[j] += 1
+                    self.model_history[j].append(-1)
+                else:
+                    self.a_trust[j] += 1
+                    self.model_history[j].append(1)
+        elif accelerated:
+            for j in list(set(self.neighbors) - set([self.client_id])):
+                if len(self.model_history[j]) == 0:
+                    if(LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) > LA.norm(self.betas_old[self.client_id] - self.betas_old[j])):
+                        self.b_trust[j] += 1
+                        self.model_history[j].append(-1)
+                    else:
+                        self.a_trust[j] += 1
+                        self.model_history[j].append(1)
+                else:
+                    if LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) > LA.norm(self.betas_old[self.client_id] - self.betas_old[j]) and self.model_history[j][-1] > 0:
+                        self.b_trust[j] += 1
+                        self.model_history[j].append(-1)
+                    elif LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) > LA.norm(self.betas_old[self.client_id] - self.betas_old[j]) and self.model_history[j][-1] <= 0:
+                        self.b_trust[j] += -1 * self.model_history[j][-1] + 1
+                        self.model_history[j].append(self.model_history[j][-1] - 1)
+                    elif LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) <= LA.norm(self.betas_old[self.client_id] - self.betas_old[j]) and self.model_history[j][-1] > 0:
+                        self.a_trust[j] += self.model_history[j][-1] + 1
+                        self.model_history[j].append(self.model_history[j][-1] + 1)
+                    elif LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) <= LA.norm(self.betas_old[self.client_id] - self.betas_old[j]) and self.model_history[j][-1] <= 0:
+                        self.a_trust[j] += 1
+                        self.model_history[j].append(1)
+            
     
     def update_trust(self, trust = "Both"):
         if trust == "Gradient":
@@ -56,7 +112,10 @@ class Client:
             self.update_model_based_trust()
         elif trust == "Both":
             self.update_gradient_based_trust()
-            self.update_model_based_trust()   
+            self.update_model_based_trust()
+        elif trust == "Accelerated":
+            self.update_gradient_based_trust(accelerated = True)
+            self.update_model_based_trust(accelerated = True)
         for j in list(set(self.neighbors) - set([self.client_id])):
             self.trust[j] = self.a_trust[j] / (self.a_trust[j] + self.b_trust[j])
     
@@ -260,10 +319,14 @@ class Client:
             self.reset_beta_temp()
             
 class Adversary(Client):
-    def __init__(self, client_id, neighbors, X, Y, corrupt_fraction):
-        n = np.shape(X)[0]
-        Y[random.sample(range(n), round(n * corrupt_fraction))] *= -1
-        super().__init__(client_id, neighbors, X, Y)
+    # topology_params: client_id, neighbors
+    # data_params: X, Y
+    # adversary_params: corrupt_fraction
+    def __init__(self, topology_params, data_params, adversary_params):
+        n = np.shape(data_params["X"])[0]
+        corrupt_fraction = adversary_params["corrupt_fraction"]
+        data_params["Y"][random.sample(range(n), round(n * corrupt_fraction))] *= -1
+        super().__init__(topology_params, data_params)
         
     def select_step_size(self, scheme, curr_iter, max_step_size, threshold):
         invphi = (5 ** 0.5 - 1) / 2
