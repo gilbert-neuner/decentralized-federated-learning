@@ -16,6 +16,7 @@ def generate_X_Y(n, beta_true, SNR = 1):
     Y = X @ beta_true + epsilon
     return X, Y
 
+# reminder: self-neighbors
 def generate_adj_mtx(K = 10, shape = "mesh"):
     if shape == "mesh":
         adjacency_matrix = np.ones([K, K], dtype = int)
@@ -35,5 +36,13 @@ def generate_adj_mtx(K = 10, shape = "mesh"):
             adjacency_matrix[0, k] = 1
             adjacency_matrix[k, 0] = 1
             adjacency_matrix[k, k] = 1
+    elif shape == "band":
+        adjacency_matrix = np.zeros([K, K], dtype = int)
+        for i in range(K):
+            adjacency_matrix[i, ((i - 2) % K)] = 1
+            adjacency_matrix[i, ((i - 1) % K)] = 1
+            adjacency_matrix[i, (i % K)] = 1
+            adjacency_matrix[i, ((i + 1) % K)] = 1
+            adjacency_matrix[i, ((i + 2) % K)] = 1
     return adjacency_matrix
         

@@ -51,7 +51,7 @@ class Communication_Network:
     
     # algorithm_params: scheme, max_step_size, n_iter, threshold
     # start_params: start, beta0
-    # trust_params: trust
+    # trust_params: info, accelerate, include
     # diagnostic_params: beta_true
     def run_algorithm(self, algorithm_params, start_params, trust_params, diagnostic_params):
         scheme = algorithm_params["scheme"]
@@ -60,11 +60,10 @@ class Communication_Network:
         threshold = algorithm_params["threshold"]
         start = start_params["start"]
         beta0 = start_params["beta0"]
-        trust = trust_params["trust"]
         beta_true = diagnostic_params["beta_true"]
         
         self.initialize_start(start_params)
-        if(trust == "None"):
+        if(trust_params["info"] == "None"):
             for iteration in range(n_iter):
                 self.BROADCAST()
                 for i in range(self.K):
@@ -75,7 +74,7 @@ class Communication_Network:
             for iteration in range(n_iter):
                 self.BROADCAST()
                 for i in range(self.K):
-                    self.comm_graph[i].update_trust(trust)
+                    self.comm_graph[i].update_trust(trust_params)
                     self.comm_graph[i].select_step_size(scheme, iteration, max_step_size, threshold)
                     self.comm_graph[i].update_betas_old()
                     

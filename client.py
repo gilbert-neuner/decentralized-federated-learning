@@ -40,82 +40,111 @@ class Client:
         gradient_ij = np.transpose(self.X) @ (self.X @ self.betas_temp[j] - self.Y) / self.n
         return 0.5 * (np.dot(gradient_ij, self.gradients[j]) / (LA.norm(gradient_ij) * LA.norm(self.gradients[j])) + 1)
     
-    def update_gradient_based_trust(self, accelerated = False):
-        if not accelerated:
+    def model_similarity(self, j):
+        return LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) / LA.norm(self.betas_old[self.client_id] - self.betas_old[j])
+    
+    def rank_dict(self, d, desc):
+        # Sort the items by value
+        sorted_items = sorted(d.items(), key=lambda x: x[1], reverse = desc)
+        # Assign ranks
+        ranks = {k: rank / (len(d) - 1) for rank, (k, v) in enumerate(sorted_items)}
+        return ranks
+    
+    def check_gradient(self, include):
+        cosine_similarity_measures = {j: self.cosine_similarity(j) for j in list(set(self.neighbors) - set([self.client_id]))}
+        ranked_cosines = self.rank_dict(cosine_similarity_measures, desc = True)
+        if include < 0:
+            return {j: cosine_similarity_measures[j] > 0.5 and ranked_cosines[j] < -1 * include for j in list(set(self.neighbors) - set([self.client_id]))}
+        else:
+            return {j: cosine_similarity_measures[j] > 0.5 or ranked_cosines[j] < include for j in list(set(self.neighbors) - set([self.client_id]))}
+    
+    def check_model(self, include):
+        model_similarity_measures = {j: self.model_similarity(j) for j in list(set(self.neighbors) - set([self.client_id]))}
+        ranked_models = self.rank_dict(model_similarity_measures, desc = False)
+        if include < 0:
+            return {j: model_similarity_measures[j] < 1 and ranked_models[j] < -1 * include for j in list(set(self.neighbors) - set([self.client_id]))}
+        else:
+            return {j: model_similarity_measures[j] < 1 or ranked_models[j] < include for j in list(set(self.neighbors) - set([self.client_id]))}
+    
+    def update_gradient_based_trust(self, accelerate, include):
+        gradient_suspicion = self.check_gradient(include)
+        if not accelerate:
             for j in list(set(self.neighbors) - set([self.client_id])):
-                if self.cosine_similarity(j) > 0.5:
+                if gradient_suspicion[j]:
                     self.a_trust[j] += 1
                     self.gradient_history[j].append(1)
                 else:
                     self.b_trust[j] += 1
                     self.gradient_history[j].append(-1)
-        elif accelerated:
+        elif accelerate:
             for j in list(set(self.neighbors) - set([self.client_id])):
                 if len(self.gradient_history[j]) == 0:
-                    if self.cosine_similarity(j) > 0.5:
+                    if gradient_suspicion[j]:
                         self.a_trust[j] += 1
                         self.gradient_history[j].append(1)
                     else:
                         self.b_trust[j] += 1
                         self.gradient_history[j].append(-1)
                 else:
-                    if self.cosine_similarity(j) > 0.5 and self.gradient_history[j][-1] > 0:
+                    if gradient_suspicion[j] and self.gradient_history[j][-1] > 0:
                         self.a_trust[j] += self.gradient_history[j][-1] + 1
                         self.gradient_history[j].append(self.gradient_history[j][-1] + 1)
-                    elif self.cosine_similarity(j) > 0.5 and self.gradient_history[j][-1] <= 0:
+                    elif gradient_suspicion[j] and self.gradient_history[j][-1] <= 0:
                         self.a_trust[j] += 1
                         self.gradient_history[j].append(1)
-                    elif self.cosine_similarity(j) <= 0.5 and self.gradient_history[j][-1] > 0:
+                    elif not gradient_suspicion[j] and self.gradient_history[j][-1] > 0:
                         self.b_trust[j] += 1
                         self.gradient_history[j].append(-1)
-                    elif self.cosine_similarity(j) <= 0.5 and self.gradient_history[j][-1] <= 0:
+                    elif not gradient_suspicion[j] and self.gradient_history[j][-1] <= 0:
                         self.b_trust[j] += -1 * self.gradient_history[j][-1] + 1
                         self.gradient_history[j].append(self.gradient_history[j][-1] - 1)
     
-    def update_model_based_trust(self, accelerated = False):
-        if not accelerated:
+    def update_model_based_trust(self, accelerate, include):
+        model_suspicion = self.check_model(include)
+        if not accelerate:
             for j in list(set(self.neighbors) - set([self.client_id])):
-                if(LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) > LA.norm(self.betas_old[self.client_id] - self.betas_old[j])):
+                if model_suspicion[j]:
                     self.b_trust[j] += 1
                     self.model_history[j].append(-1)
                 else:
                     self.a_trust[j] += 1
                     self.model_history[j].append(1)
-        elif accelerated:
+        elif accelerate:
             for j in list(set(self.neighbors) - set([self.client_id])):
                 if len(self.model_history[j]) == 0:
-                    if(LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) > LA.norm(self.betas_old[self.client_id] - self.betas_old[j])):
+                    if model_suspicion[j]:
                         self.b_trust[j] += 1
                         self.model_history[j].append(-1)
                     else:
                         self.a_trust[j] += 1
                         self.model_history[j].append(1)
                 else:
-                    if LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) > LA.norm(self.betas_old[self.client_id] - self.betas_old[j]) and self.model_history[j][-1] > 0:
+                    if not model_suspicion[j] and self.model_history[j][-1] > 0:
                         self.b_trust[j] += 1
                         self.model_history[j].append(-1)
-                    elif LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) > LA.norm(self.betas_old[self.client_id] - self.betas_old[j]) and self.model_history[j][-1] <= 0:
+                    elif not model_suspicion[j] and self.model_history[j][-1] <= 0:
                         self.b_trust[j] += -1 * self.model_history[j][-1] + 1
                         self.model_history[j].append(self.model_history[j][-1] - 1)
-                    elif LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) <= LA.norm(self.betas_old[self.client_id] - self.betas_old[j]) and self.model_history[j][-1] > 0:
+                    elif model_suspicion[j] and self.model_history[j][-1] > 0:
                         self.a_trust[j] += self.model_history[j][-1] + 1
                         self.model_history[j].append(self.model_history[j][-1] + 1)
-                    elif LA.norm(self.betas_temp[self.client_id] - self.betas_temp[j]) <= LA.norm(self.betas_old[self.client_id] - self.betas_old[j]) and self.model_history[j][-1] <= 0:
+                    elif model_suspicion[j] and self.model_history[j][-1] <= 0:
                         self.a_trust[j] += 1
                         self.model_history[j].append(1)
             
     
-    def update_trust(self, trust = "Both"):
-        if trust == "Gradient":
-            self.update_gradient_based_trust()
-        elif trust == "Model":
-            self.update_model_based_trust()
-        elif trust == "Both":
-            self.update_gradient_based_trust()
-            self.update_model_based_trust()
-        elif trust == "Accelerated":
-            self.update_gradient_based_trust(accelerated = True)
-            self.update_model_based_trust(accelerated = True)
+    def update_trust(self, trust_params):
+        info = trust_params["info"]
+        accelerate = trust_params["accelerate"]
+        include = trust_params["include"]
+        
+        if info == "Gradient":
+            self.update_gradient_based_trust(accelerate, include)
+        elif info == "Model":
+            self.update_model_based_trust(accelerate, include)
+        elif info == "Both":
+            self.update_gradient_based_trust(accelerate, include)
+            self.update_model_based_trust(accelerate, include)
         for j in list(set(self.neighbors) - set([self.client_id])):
             self.trust[j] = self.a_trust[j] / (self.a_trust[j] + self.b_trust[j])
     

@@ -24,7 +24,6 @@ def grid_search(topology_params, data_params, algorithm_params, grid_params, sta
     seed = grid_params["seed"]
     start = start_params["start"]
     beta0 = start_params["beta0"]
-    trust = trust_params["trust"]
     which_adversaries = adversary_params["which_adversaries"]
     corrupt_fraction = adversary_params["corrupt_fraction"]
     
@@ -93,7 +92,6 @@ def run_experiment(topology_params, data_params, algorithm_params, experiment_pa
     seed = experiment_params["seed"]
     start = start_params["start"]
     beta0 = start_params["beta0"]
-    trust = trust_params["trust"]
     which_adversaries = adversary_params["which_adversaries"]
     corrupt_fraction = adversary_params["corrupt_fraction"]
     
@@ -140,7 +138,6 @@ def analyze_trust_history(topology_params, data_params, algorithm_params, experi
     seed = experiment_params["seed"]
     start = start_params["start"]
     beta0 = start_params["beta0"]
-    trust = trust_params["trust"]
     which_adversaries = adversary_params["which_adversaries"]
     corrupt_fraction = adversary_params["corrupt_fraction"]
     
