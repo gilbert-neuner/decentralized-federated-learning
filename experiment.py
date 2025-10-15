@@ -1,6 +1,8 @@
+import numpy as np
+import random
 from communication_network import Communication_Network
-from diagnostic import *
-from generate_data import *
+from diagnostic import confusion_matrix, F1, rel_norm
+from generate_data import generate_beta_true, generate_X_Y
 
 # topology_params: adjacency_matrix
 # data_params: n, p, SNR, sparsity
@@ -15,17 +17,17 @@ def grid_search(topology_params, data_params, algorithm_params, grid_params, sta
     p = data_params["p"]
     SNR = data_params["SNR"]
     sparsity = data_params["sparsity"]
-    scheme = algorithm_params["scheme"]
-    max_step_size = algorithm_params["max_step_size"]
-    n_iter = algorithm_params["n_iter"]
+    scheme = algorithm_params["scheme"] # NOQA
+    max_step_size = algorithm_params["max_step_size"] # NOQA
+    n_iter = algorithm_params["n_iter"] # NOQA
     n_rep = grid_params["n_rep"]
     thresholds = grid_params["thresholds"]
     metric = grid_params["metric"]
     seed = grid_params["seed"]
-    start = start_params["start"]
-    beta0 = start_params["beta0"]
+    start = start_params["start"] # NOQA
+    beta0 = start_params["beta0"] # NOQA
     which_adversaries = adversary_params["which_adversaries"]
-    corrupt_fraction = adversary_params["corrupt_fraction"]
+    corrupt_fraction = adversary_params["corrupt_fraction"] # NOQA
     
     K = np.shape(adjacency_matrix)[0]
     REL_NORMS = np.zeros(len(thresholds))
@@ -84,16 +86,16 @@ def run_experiment(topology_params, data_params, algorithm_params, experiment_pa
     p = data_params["p"]
     SNR = data_params["SNR"]
     sparsity = data_params["sparsity"]
-    scheme = algorithm_params["scheme"]
-    max_step_size = algorithm_params["max_step_size"]
-    n_iter = algorithm_params["n_iter"]
-    threshold = algorithm_params["threshold"]
+    scheme = algorithm_params["scheme"] # NOQA
+    max_step_size = algorithm_params["max_step_size"] # NOQA
+    n_iter = algorithm_params["n_iter"] # NOQA
+    threshold = algorithm_params["threshold"] # NOQA
     n_rep = experiment_params["n_rep"]
     seed = experiment_params["seed"]
-    start = start_params["start"]
-    beta0 = start_params["beta0"]
-    which_adversaries = adversary_params["which_adversaries"]
-    corrupt_fraction = adversary_params["corrupt_fraction"]
+    start = start_params["start"] # NOQA
+    beta0 = start_params["beta0"] # NOQA
+    which_adversaries = adversary_params["which_adversaries"] # NOQA
+    corrupt_fraction = adversary_params["corrupt_fraction"] # NOQA
     
     K = np.shape(adjacency_matrix)[0]
     REL_NORMS = np.zeros((K, n_rep))
@@ -130,16 +132,16 @@ def analyze_trust_history(topology_params, data_params, algorithm_params, experi
     p = data_params["p"]
     SNR = data_params["SNR"]
     sparsity = data_params["sparsity"]
-    scheme = algorithm_params["scheme"]
-    max_step_size = algorithm_params["max_step_size"]
-    n_iter = algorithm_params["n_iter"]
-    threshold = algorithm_params["threshold"]
-    n_rep = experiment_params["n_rep"]
+    scheme = algorithm_params["scheme"] # NOQA
+    max_step_size = algorithm_params["max_step_size"] # NOQA
+    n_iter = algorithm_params["n_iter"] # NOQA
+    threshold = algorithm_params["threshold"] # NOQA
+    n_rep = experiment_params["n_rep"] # NOQA
     seed = experiment_params["seed"]
-    start = start_params["start"]
-    beta0 = start_params["beta0"]
-    which_adversaries = adversary_params["which_adversaries"]
-    corrupt_fraction = adversary_params["corrupt_fraction"]
+    start = start_params["start"] # NOQA
+    beta0 = start_params["beta0"] # NOQA
+    which_adversaries = adversary_params["which_adversaries"] # NOQA
+    corrupt_fraction = adversary_params["corrupt_fraction"] # NOQA
     
     K = np.shape(adjacency_matrix)[0]
     

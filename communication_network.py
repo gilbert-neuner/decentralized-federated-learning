@@ -20,8 +20,12 @@ class Communication_Network:
             neighbors = list(np.where(adjacency_matrix[k, :] == 1)[0])
             topology_params = {"client_id": k, "neighbors": neighbors}
             data_params = {"X": X[k], "Y": Y[k]}
-            if(k in which_adversaries): 
-                self.comm_graph.append(Adversary(topology_params = topology_params, data_params = data_params, adversary_params = adversary_params))
+            if(k in which_adversaries):
+                corrupt_fraction = adversary_params["corrupt_fraction"]
+                if(isinstance(corrupt_fraction, dict)):
+                    self.comm_graph.append(Adversary(topology_params = topology_params, data_params = data_params, adversary_params = {"which_adversaries":which_adversaries, "corrupt_fraction":corrupt_fraction[k]}))
+                else:
+                    self.comm_graph.append(Adversary(topology_params = topology_params, data_params = data_params, adversary_params = adversary_params))
             else:
                 self.comm_graph.append(Client(topology_params = topology_params, data_params = data_params))
             

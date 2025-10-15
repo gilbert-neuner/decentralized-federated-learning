@@ -1,0 +1,22 @@
+# algorithm_params: scheme, max_step_size, n_iter, threshold
+    # start_params: start, beta0
+    # trust_params: trust
+    # diagnostic_params: beta_true
+
+most local to most global
+client iteration
+graph iteration
+algorithm
+experiment
+
+client: can see X and Y
+graph: handles topology
+experiment: can see beta_true
+
+client iteration: updates workspace
+graph iteration: handles communication, returns all beta_currs
+algorithm: sees beta_currs and can do F1 history and whatnot
+
+LATER: NEW TRUST SCHEME
+
+LATER: DATAFRAME OUTPUT
