@@ -1,8 +1,7 @@
 import numpy as np
 from numpy import linalg as LA
 from client import Client, Adversary
-from generate_data import *
-from diagnostic import *
+from diagnostic import confusion_matrix, F1, rel_norm
 
 class Communication_Network:
     # topology_params: adjacency_matrix
@@ -73,8 +72,9 @@ class Communication_Network:
                 for i in range(self.K):
                     self.comm_graph[i].select_step_size(scheme, iteration, max_step_size, threshold)
         else:
-            F1_history = [[[]] for _ in range(self.K)]
+            F1_history = [[] for _ in range(self.K)]
             rel_norm_history = [[] for _ in range(self.K)]
+            beta_history = [[] for _ in range(self.K)]
             for iteration in range(n_iter):
                 self.BROADCAST()
                 for i in range(self.K):
@@ -86,4 +86,6 @@ class Communication_Network:
                         F1_history[i].append(F1(confusion_matrix(beta_true, self.comm_graph[i].beta_curr)))
                         rel_norm_history[i].append(rel_norm(beta_true, self.comm_graph[i].beta_curr))
                     
-        return F1_history, rel_norm_history
+                    beta_history[i].append(self.comm_graph[i].beta_curr)
+                    
+        return F1_history, rel_norm_history, beta_history

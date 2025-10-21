@@ -149,6 +149,7 @@ def analyze_trust_history(topology_params, data_params, algorithm_params, experi
     F1s = np.zeros(K)
     gradient_history = [0 for _ in range(K)]
     model_history = [0 for _ in range(K)]
+    beta_history = [0 for _ in range(K)]
     
     random.seed(seed)
     np.random.seed(seed)
@@ -165,7 +166,7 @@ def analyze_trust_history(topology_params, data_params, algorithm_params, experi
     comm_graph = Communication_Network(topology_params, data_params_XY, adversary_params)
     
     diagnostic_params = {"beta_true": beta_true}
-    F1_history, rel_norm_history = comm_graph.run_algorithm(algorithm_params, start_params, trust_params, diagnostic_params)
+    F1_history, rel_norm_history, beta_history = comm_graph.run_algorithm(algorithm_params, start_params, trust_params, diagnostic_params)
     
     for k in range(K):
         rel_norms[k] = rel_norm(beta_true, comm_graph.comm_graph[k].beta_curr)
@@ -173,4 +174,4 @@ def analyze_trust_history(topology_params, data_params, algorithm_params, experi
         gradient_history[k] = comm_graph.comm_graph[k].gradient_history
         model_history[k] = comm_graph.comm_graph[k].model_history
         
-    return rel_norms, F1s, gradient_history, model_history, F1_history, rel_norm_history
+    return rel_norms, F1s, gradient_history, model_history, F1_history, rel_norm_history, beta_history
