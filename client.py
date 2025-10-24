@@ -352,34 +352,73 @@ class Adversary(Client):
     # data_params: X, Y
     # adversary_params: corrupt_fraction
     def __init__(self, topology_params, data_params, adversary_params):
-        n = np.shape(data_params["X"])[0]
         corrupt_fraction = adversary_params["corrupt_fraction"]
-        data_params["Y"][random.sample(range(n), round(n * corrupt_fraction))] *= -1
+        self.adversary_type = adversary_params["adversary_type"]
+        if self.adversary_type == "data":
+            n = np.shape(data_params["X"])[0]
+            data_params["Y"][random.sample(range(n), round(n * corrupt_fraction))] *= -1
+        elif self.adversary_type == "local_model":
+            p = np.shape(data_params["X"])[1]
+            self.corrupt_indices = random.sample(range(p), round(p * corrupt_fraction))
+            self.corrupt_coefficient = adversary_params["corrupt_coefficient"]
         super().__init__(topology_params, data_params)
         
+    def CORRUPT(self):
+        beta_diff = np.copy(self.betas_temp[self.client_id]) - np.copy(self.beta_curr)
+        self.betas_temp[self.client_id][self.corrupt_indices] -= self.corrupt_coefficient * beta_diff[self.corrupt_indices]
+        
     def select_step_size(self, scheme, curr_iter, max_step_size, threshold):
-        invphi = (5 ** 0.5 - 1) / 2
-        a = 0
-        b = max_step_size
-
-        while b - a > 1 / (curr_iter + 1):
-            c = b - (b - a) * invphi
-            self.GRADIENT(c)
-            self.THRESHOLD(c, threshold)
-            fc = self.objective_function(threshold)
+        if self.adversary_type == "data":
+            invphi = (5 ** 0.5 - 1) / 2
+            a = 0
+            b = max_step_size
+    
+            while b - a > 1 / (curr_iter + 1):
+                c = b - (b - a) * invphi
+                self.GRADIENT(c)
+                self.THRESHOLD(c, threshold)
+                fc = self.objective_function(threshold)
+                self.reset_beta_temp()
+                
+                d = a + (b - a) * invphi
+                self.GRADIENT(d)
+                self.THRESHOLD(d, threshold)
+                fd = self.objective_function(threshold)
+                self.reset_beta_temp()
+                
+                if fc < fd:
+                    b = d
+                else:
+                    a = c        
+            self.GRADIENT((a + b) / 2)
+            self.THRESHOLD((a + b) / 2, threshold)
+            self.update_beta_curr()
             self.reset_beta_temp()
-            
-            d = a + (b - a) * invphi
-            self.GRADIENT(d)
-            self.THRESHOLD(d, threshold)
-            fd = self.objective_function(threshold)
+        
+        elif self.adversary_type == "local_model":
+            invphi = (5 ** 0.5 - 1) / 2
+            a = 0
+            b = max_step_size
+    
+            while b - a > 1 / (curr_iter + 1):
+                c = b - (b - a) * invphi
+                self.GRADIENT(c)
+                self.THRESHOLD(c, threshold)
+                fc = self.objective_function(threshold)
+                self.reset_beta_temp()
+                
+                d = a + (b - a) * invphi
+                self.GRADIENT(d)
+                self.THRESHOLD(d, threshold)
+                fd = self.objective_function(threshold)
+                self.reset_beta_temp()
+                
+                if fc < fd:
+                    b = d
+                else:
+                    a = c        
+            self.GRADIENT((a + b) / 2)
+            self.THRESHOLD((a + b) / 2, threshold)
+            self.CORRUPT()
+            self.update_beta_curr()
             self.reset_beta_temp()
-            
-            if fc < fd:
-                b = d
-            else:
-                a = c        
-        self.GRADIENT((a + b) / 2)
-        self.THRESHOLD((a + b) / 2, threshold)
-        self.update_beta_curr()
-        self.reset_beta_temp()

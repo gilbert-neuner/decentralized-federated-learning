@@ -12,12 +12,12 @@ def get_rel_norm_value(friendly_ids, iteration, rel_norm_history_exp):
         friendly_sum += rel_norm_history_exp[friendly_id][iteration]
     return friendly_sum / len(friendly_ids)
 
-for scheme, thickness in product(["G", "A", "(AC)"], [2, 6, 10]): # 
+for scheme, thickness in product(["G", "A", "(AC)"], [2, 4, 6, 8, 10]): # 
     K = 20
     shape = "band"
     if shape == "band":
         topology_params = {"adjacency_matrix": generate_adj_mtx(K, shape, thickness)}
-        adversary_params = {"which_adversaries": [1, 3, 5, 7, 9, 11, 13, 15, 17, 19], "corrupt_fraction": {1:0.5, 3:1, 5:0.5, 7:1, 9:0.5, 11:1, 13:0.5, 15:1, 17:0.5, 19:1}}
+        adversary_params = {"which_adversaries": [1, 3, 5, 7, 9, 11, 13, 15, 17, 19], "corrupt_fraction": {1:0.5, 3:1, 5:0.5, 7:1, 9:0.5, 11:1, 13:0.5, 15:1, 17:0.5, 19:1}, "adversary_type": "local_model", "corrupt_coefficient": 1.01}
         all_friendly_ids = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18]
         adversary2_ids = [3, 7, 11, 15, 19]
         adversary_ids = [1, 5, 9, 13, 17]
@@ -44,7 +44,7 @@ for scheme, thickness in product(["G", "A", "(AC)"], [2, 6, 10]): #
     algorithm_params["threshold"] = grid_search(topology_params, data_params, algorithm_params, grid_params, start_params, trust_params, adversary_params)
     experiment_params = {"n_rep": 10, "seed": 12345}
     
-    rel_norm_exp, F1_exp, gradient_history_exp, model_history_exp, F1_history_exp, rel_norm_history_exp, beta_history_exp = analyze_trust_history(topology_params, data_params, algorithm_params, experiment_params, start_params, trust_params, adversary_params)
+    rel_norm_exp, F1_exp, gradient_history_exp, model_history_exp, F1_history_exp, rel_norm_history_exp, beta_history_exp, beta_true_exp = analyze_trust_history(topology_params, data_params, algorithm_params, experiment_params, start_params, trust_params, adversary_params)
     
     all_client_ids = list(range(0, K))
     

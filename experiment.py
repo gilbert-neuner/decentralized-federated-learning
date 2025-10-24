@@ -174,4 +174,4 @@ def analyze_trust_history(topology_params, data_params, algorithm_params, experi
         gradient_history[k] = comm_graph.comm_graph[k].gradient_history
         model_history[k] = comm_graph.comm_graph[k].model_history
         
-    return rel_norms, F1s, gradient_history, model_history, F1_history, rel_norm_history, beta_history
+    return rel_norms, F1s, gradient_history, model_history, F1_history, rel_norm_history, beta_history, beta_true
