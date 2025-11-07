@@ -5,12 +5,12 @@ from generate_data import generate_adj_mtx
 
 K = 10
 topology_params = {"adjacency_matrix": generate_adj_mtx(K, shape = "mesh")}
-adversary_params = {"which_adversaries": [1, 3, 5, 7, 9], "corrupt_fraction": {1:1, 3:1, 5:1, 7:1, 9:1}, "adversary_type": "local_model", "corrupt_coefficient": 1.01}
+adversary_params = {"which_adversaries": [1, 3, 5, 7, 9], "corrupt_fraction": {1:1, 3:1, 5:1, 7:1, 9:1}, "adversary_type": "specific_model", "beta_target": np.array([1, 0])} # 1.01
 all_friendly_ids = [0, 2, 4, 6, 8]
 adversary2_ids = []
 adversary_ids = [1, 3, 5, 7, 9]
 data_params = {"n": 1, "p": 2, "SNR": 1, "sparsity": 0.5}
-algorithm_params = {"scheme": "(AC)", "max_step_size": 0.1, "n_iter": 100, "threshold": 1}
+algorithm_params = {"scheme": "A", "max_step_size": 0.1, "n_iter": 100, "threshold": 0.5}
 start_params = {"start": "random", "beta0": None}
 trust_params = {"info": "Both", "accelerate": True, "include": 0}
 experiment_params = {"n_rep": 10, "seed": 12345}
@@ -31,12 +31,16 @@ for seq in all_client_ids:
     dy = np.diff(y)
     if seq in all_friendly_ids:
         col = "green"
+        plt.plot(x[-1], y[-1], 'go')
     elif seq in adversary_ids:
         col = "orange"
+        plt.plot(x[-1], y[-1], 'yo')
     elif seq in adversary2_ids:
         col = "orange"
+        plt.plot(x[-1], y[-1], 'yo')
     plt.quiver(x[:-1], y[:-1], dx, dy, color = col, angles='xy', scale_units='xy', scale = 1)
-plt.plot(beta_true_exp[0], beta_true_exp[1], 'ro') 
+plt.plot(beta_true_exp[0], beta_true_exp[1], 'bo') 
+plt.plot(adversary_params["beta_target"][0], adversary_params["beta_target"][1], "ro")
 plt.show()
 
 print("\a")

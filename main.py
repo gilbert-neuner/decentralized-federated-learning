@@ -1,10 +1,11 @@
 import numpy as np
+from numpy import linalg as LA
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from itertools import product
 from experiment import grid_search, analyze_trust_history
-from generate_data import generate_adj_mtx
+from generate_data import generate_adj_mtx, generate_beta_true
 
 def get_rel_norm_value(friendly_ids, iteration, rel_norm_history_exp):
     friendly_sum = 0
@@ -12,31 +13,37 @@ def get_rel_norm_value(friendly_ids, iteration, rel_norm_history_exp):
         friendly_sum += rel_norm_history_exp[friendly_id][iteration]
     return friendly_sum / len(friendly_ids)
 
-for scheme, thickness in product(["G", "A", "(AC)"], [2, 4, 6, 8, 10]): # 
+p = 100
+sparsity = 0.05
+n_iter = 100
+
+df_out = pd.DataFrame(columns = ["scheme", "thickness", "rel_norm", "F1", "norm", "sparsity"])
+
+for scheme, thickness in product(["G", "A", "(AC)"], [2, 4, 6, 8, 10]): 
     K = 20
     shape = "band"
     if shape == "band":
         topology_params = {"adjacency_matrix": generate_adj_mtx(K, shape, thickness)}
-        adversary_params = {"which_adversaries": [1, 3, 5, 7, 9, 11, 13, 15, 17, 19], "corrupt_fraction": {1:0.5, 3:1, 5:0.5, 7:1, 9:0.5, 11:1, 13:0.5, 15:1, 17:0.5, 19:1}, "adversary_type": "local_model", "corrupt_coefficient": 1.01}
+        adversary_params = {"which_adversaries": [1, 3, 5, 7, 9, 11, 13, 15, 17, 19], "corrupt_fraction": {1:0.5, 3:1, 5:0.5, 7:1, 9:0.5, 11:1, 13:0.5, 15:1, 17:0.5, 19:1}, "adversary_type": "specific_model", "beta_target": generate_beta_true(p, sparsity)}
         all_friendly_ids = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18]
         adversary2_ids = [3, 7, 11, 15, 19]
         adversary_ids = [1, 5, 9, 13, 17]
-    elif shape == "bridged ring":
-        adjacency_matrix = generate_adj_mtx(K, "ring")
-        adjacency_matrix[4, 6] = 1
-        adjacency_matrix[6, 4] = 1
-        adjacency_matrix[9, 11] = 1
-        adjacency_matrix[11, 9] = 1
-        adjacency_matrix[14, 16] = 1
-        adjacency_matrix[16, 14] = 1
-        topology_params = {"adjacency_matrix": adjacency_matrix}
-        adversary_params = {"which_adversaries": [0, 5, 10, 15], "corrupt_fraction": {0:0.5, 5:1, 10:0.5, 15:1}}
-        all_friendly_ids = [1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19]
-        adversary2_ids = [5, 15]
-        adversary_ids = [0, 10]
+    # elif shape == "bridged ring":
+    #     adjacency_matrix = generate_adj_mtx(K, "ring")
+    #     adjacency_matrix[4, 6] = 1
+    #     adjacency_matrix[6, 4] = 1
+    #     adjacency_matrix[9, 11] = 1
+    #     adjacency_matrix[11, 9] = 1
+    #     adjacency_matrix[14, 16] = 1
+    #     adjacency_matrix[16, 14] = 1
+    #     topology_params = {"adjacency_matrix": adjacency_matrix}
+    #     adversary_params = {"which_adversaries": [0, 5, 10, 15], "corrupt_fraction": {0:0.5, 5:1, 10:0.5, 15:1}}
+    #     all_friendly_ids = [1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19]
+    #     adversary2_ids = [5, 15]
+    #     adversary_ids = [0, 10]
     
-    data_params = {"n": 50, "p": 100, "SNR": 1, "sparsity": 0.05} # {"n": 1, "p": 2, "SNR": 1, "sparsity": 0.5}
-    algorithm_params = {"scheme": scheme, "max_step_size": 1, "n_iter": 100}
+    data_params = {"n": 50, "p": p, "SNR": 1, "sparsity": sparsity}
+    algorithm_params = {"scheme": scheme, "max_step_size": 1, "n_iter": n_iter}
     grid_params = {"n_rep": 3, "thresholds": 10 ** np.arange(-1, 1.1, 0.5), "metric": "rel_norm", "seed": 1234}
     start_params = {"start": "identical", "beta0": None}
     trust_params = {"info": "Both", "accelerate": True, "include": 0}
@@ -107,25 +114,19 @@ for scheme, thickness in product(["G", "A", "(AC)"], [2, 4, 6, 8, 10]): #
         borderaxespad=0
     )
     
+    # compute L2 norm and sparsity
+    norm_out = 0
+    sparsity_out = 0
+    for i in all_friendly_ids:
+        norm_out += LA.norm(beta_history_exp[i][n_iter - 1])
+        sparsity_out += np.mean(beta_history_exp[i][n_iter - 1] != 0)
+    norm_out /= len(all_friendly_ids)
+    sparsity_out /= len(all_friendly_ids)
+    
+    # add to data frame "method", "thickness", "rel_norm", "F1", "norm", "sparsity"
+    new_row = pd.DataFrame({"scheme": [scheme], "thickness": [thickness], "rel_norm": [np.mean(rel_norm_exp[all_friendly_ids])], "F1": [np.mean(F1_exp[all_friendly_ids])], "norm": [norm_out], "sparsity": [sparsity_out]})
+    df_out = pd.concat([df_out, new_row], ignore_index = True)
+    
     print(scheme)
     
 print("\a")
-
-# orange_cmap = plt.get_cmap('Oranges')
-# blue_cmap   = plt.get_cmap('Blues')
-# green_cmap  = plt.get_cmap('Greens')
-
-# plt.figure()
-# for seq in range(0, 20):
-#     coords = np.stack(beta_history_exp[seq])
-#     x, y = coords[:, 0], coords[:, 1]
-#     if seq in all_friendly_ids:
-#         col = green_cmap((seq - min(all_friendly_ids)) / (len(all_friendly_ids) - 1))
-#     elif seq in adversary_ids:
-#         col = orange_cmap((seq - min(adversary_ids)) / (len(adversary_ids) - 1))
-#     elif seq in adversary2_ids:
-#         col = blue_cmap((seq - min(adversary2_ids)) / (len(adversary2_ids) - 1))
-#     plt.plot(x, y, alpha = 0.5, color = col)
-# plt.show()
-    
-# TODO: why are rel_norm_means different for G and (GC)

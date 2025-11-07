@@ -361,6 +361,8 @@ class Adversary(Client):
             p = np.shape(data_params["X"])[1]
             self.corrupt_indices = random.sample(range(p), round(p * corrupt_fraction))
             self.corrupt_coefficient = adversary_params["corrupt_coefficient"]
+        elif self.adversary_type == "specific_model":
+            data_params["Y"] = data_params["X"] @ adversary_params["beta_target"]
         super().__init__(topology_params, data_params)
         
     def CORRUPT(self):
@@ -368,7 +370,7 @@ class Adversary(Client):
         self.betas_temp[self.client_id][self.corrupt_indices] -= self.corrupt_coefficient * beta_diff[self.corrupt_indices]
         
     def select_step_size(self, scheme, curr_iter, max_step_size, threshold):
-        if self.adversary_type == "data":
+        if self.adversary_type == "data" or self.adversary_type == "specific_model":
             invphi = (5 ** 0.5 - 1) / 2
             a = 0
             b = max_step_size
