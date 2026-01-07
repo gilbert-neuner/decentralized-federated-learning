@@ -7,37 +7,40 @@ from generate_data import generate_beta_true, generate_X_Y
 # topology_params: adjacency_matrix
 # data_params: n, p, SNR, sparsity
 # algorithm_params: scheme, max_step_size, n_iter
-# grid_params: n_rep, thresholds, metric, seed
+# grid_params: n_rep, thresholds, local_or_global, metric, seed
 # start_params: start, beta0
 # trust_params: trust
 # adversary_params: which_adversaries, corrupt_fraction
 def grid_search(topology_params, data_params, algorithm_params, grid_params, start_params, trust_params, adversary_params):
-    adjacency_matrix = topology_params["adjacency_matrix"]
-    n = data_params["n"]
-    p = data_params["p"]
-    SNR = data_params["SNR"]
-    sparsity = data_params["sparsity"]
-    scheme = algorithm_params["scheme"] # NOQA
-    max_step_size = algorithm_params["max_step_size"] # NOQA
-    n_iter = algorithm_params["n_iter"] # NOQA
-    n_rep = grid_params["n_rep"]
+    adjacency_matrix = topology_params.get("adjacency_matrix")
+    n = data_params.get("n")
+    p = data_params.get("p")
+    SNR = data_params.get("SNR")
+    sparsity = data_params.get("sparsity")
+    beta_true = data_params.get("beta_true")
+    scheme = algorithm_params.get("scheme") # NOQA
+    max_step_size = algorithm_params.get("max_step_size") # NOQA
+    n_iter = algorithm_params.get("n_iter") # NOQA
+    n_rep = grid_params.get("n_rep")
     thresholds = grid_params["thresholds"]
-    metric = grid_params["metric"]
-    seed = grid_params["seed"]
-    start = start_params["start"] # NOQA
-    beta0 = start_params["beta0"] # NOQA
-    which_adversaries = adversary_params["which_adversaries"]
-    corrupt_fraction = adversary_params["corrupt_fraction"] # NOQA
+    local_or_global = grid_params.get("local_or_global")
+    metric = grid_params.get("metric")
+    seed = grid_params.get("seed")
+    start = start_params.get("start") # NOQA
+    beta0 = start_params.get("beta0") # NOQA
+    which_adversaries = adversary_params.get("which_adversaries")
+    corrupt_fraction = adversary_params.get("corrupt_fraction") # NOQA
     
     K = np.shape(adjacency_matrix)[0]
-    REL_NORMS = np.zeros(len(thresholds))
-    F1S = np.zeros(len(thresholds))
+    which_benign = [i for i in range(K) if i not in which_adversaries]
+    OUT = np.zeros([len(thresholds), K])
     
     for replicate in range(n_rep):
         random.seed(replicate + seed)
         np.random.seed(replicate + seed)
         
-        beta_true = generate_beta_true(p, sparsity)
+        if beta_true is None:
+            beta_true = generate_beta_true(p, sparsity)
         X = []
         Y = []
         for k in range(K):
@@ -49,33 +52,36 @@ def grid_search(topology_params, data_params, algorithm_params, grid_params, sta
         comm_graph = Communication_Network(topology_params, data_params_XY, adversary_params)
         
         for lamb in range(len(thresholds)):
-            algorithm_params["threshold"] = thresholds[lamb]
+            algorithm_params["thresholds"] = [thresholds[lamb] for i in range(K)]
             diagnostic_params = {"beta_true": beta_true}
             comm_graph.run_algorithm(algorithm_params, start_params, trust_params, diagnostic_params)
-                
-            rel_norm_out = 0
-            confusion_matrix_out = np.zeros([2, 2])
-            which_benign = [i for i in range(K) if i not in which_adversaries]
+            
             for k in which_benign:
-                rel_norm_out += rel_norm(beta_true, comm_graph.comm_graph[k].beta_curr)
-                confusion_matrix_out += confusion_matrix(beta_true, comm_graph.comm_graph[k].beta_curr)
-            REL_NORMS[lamb] += rel_norm_out / len(which_benign)
-            F1S[lamb] += F1(confusion_matrix_out)
+                if metric == "F1":
+                    OUT[lamb, k] += F1(confusion_matrix(beta_true, comm_graph.comm_graph[k].beta_curr))
+                elif metric == "rel_norm":
+                    OUT[lamb, k] += rel_norm(beta_true, comm_graph.comm_graph[k].beta_curr)
+                elif metric == "Y":
+                    OUT[lamb, k] += rel_norm(comm_graph.comm_graph[k].Y, comm_graph.comm_graph[k].X @ comm_graph.comm_graph[k].beta_curr)
             
         print(round(100 * (replicate + 1) / n_rep), "%")
-            
-    if metric == "rel_norm":
-        candidates = np.where(REL_NORMS == REL_NORMS.min())[0]
-        best_index = candidates[np.argmax(F1S[candidates])]
-        return thresholds[best_index]
-    elif metric == "F1":
-        candidates = np.where(F1S == F1S.max())[0]
-        best_index = candidates[np.argmin(REL_NORMS[candidates])]
-        return thresholds[best_index]
+        
+    if local_or_global == "local":
+        if metric == "F1":
+            global_threshold = thresholds[np.argmax(np.sum(OUT, axis = 1))]
+            return [(thresholds[np.argmax(OUT, axis = 0)[i]] if i in which_benign else global_threshold) for i in range(K)]
+        else:
+            global_threshold = thresholds[np.argmin(np.sum(OUT, axis = 1))]
+            return [(thresholds[np.argmin(OUT, axis = 0)[i]] if i in which_benign else global_threshold) for i in range(K)]
+    elif local_or_global == "global":
+        if metric == "F1":
+            return [thresholds[np.argmax(np.sum(OUT, axis = 1), axis = 0)] for i in range(K)]
+        else:
+            return [thresholds[np.argmin(np.sum(OUT, axis = 1), axis = 0)] for i in range(K)]
 
 # topology_params: adjacency_matrix
 # data_params: n, p, SNR, sparsity
-# algorithm_params: scheme, max_step_size, n_iter, threshold
+# algorithm_params: scheme, max_step_size, n_iter, thresholds
 # experiment_params: n_rep, seed
 # start_params: start, beta0
 # trust_params: trust
@@ -89,7 +95,7 @@ def run_experiment(topology_params, data_params, algorithm_params, experiment_pa
     scheme = algorithm_params["scheme"] # NOQA
     max_step_size = algorithm_params["max_step_size"] # NOQA
     n_iter = algorithm_params["n_iter"] # NOQA
-    threshold = algorithm_params["threshold"] # NOQA
+    thresholds = algorithm_params["thresholds"] # NOQA
     n_rep = experiment_params["n_rep"]
     seed = experiment_params["seed"]
     start = start_params["start"] # NOQA
@@ -130,12 +136,13 @@ def analyze_trust_history(topology_params, data_params, algorithm_params, experi
     adjacency_matrix = topology_params["adjacency_matrix"]
     n = data_params["n"]
     p = data_params["p"]
-    SNR = data_params["SNR"]
-    sparsity = data_params["sparsity"]
+    SNR = data_params.get("SNR")
+    sparsity = data_params.get("sparsity")
+    beta_true = data_params.get("beta_true")
     scheme = algorithm_params["scheme"] # NOQA
     max_step_size = algorithm_params["max_step_size"] # NOQA
     n_iter = algorithm_params["n_iter"] # NOQA
-    threshold = algorithm_params["threshold"] # NOQA
+    thresholds = algorithm_params["thresholds"] # NOQA
     n_rep = experiment_params["n_rep"] # NOQA
     seed = experiment_params["seed"]
     start = start_params["start"] # NOQA
@@ -154,7 +161,8 @@ def analyze_trust_history(topology_params, data_params, algorithm_params, experi
     random.seed(seed)
     np.random.seed(seed)
     
-    beta_true = generate_beta_true(p, sparsity)
+    if beta_true is None:
+        beta_true = generate_beta_true(p, sparsity)
     X = []
     Y = []
     for k in range(K):

@@ -4,8 +4,7 @@ import random
 def generate_beta_true(p, sparsity = 0.05):
     beta_support = random.sample(range(p), round(p * sparsity))
     beta_true = np.zeros(p)
-    for i in beta_support:
-        beta_true[beta_support, ] = 1
+    beta_true[beta_support, ] = 1
     return beta_true
 
 def generate_X_Y(n, beta_true, SNR = 1):

@@ -56,7 +56,7 @@ class Communication_Network:
                 self.comm_graph[k].beta_curr = beta0 + displacement
                 self.comm_graph[k].betas_temp[k] = beta0 + displacement
     
-    # algorithm_params: scheme, max_step_size, n_iter, threshold
+    # algorithm_params: scheme, max_step_size, n_iter, thresholds
     # start_params: start, beta0
     # trust_params: info, accelerate, include
     # diagnostic_params: beta_true
@@ -64,7 +64,7 @@ class Communication_Network:
         scheme = algorithm_params["scheme"]
         max_step_size = algorithm_params["max_step_size"]
         n_iter = algorithm_params["n_iter"]
-        threshold = algorithm_params["threshold"]
+        thresholds = algorithm_params["thresholds"]
         start = start_params["start"]
         beta0 = start_params["beta0"]
         beta_true = diagnostic_params["beta_true"]
@@ -77,7 +77,7 @@ class Communication_Network:
             for iteration in range(n_iter):
                 self.BROADCAST()
                 for i in range(self.K):
-                    self.comm_graph[i].select_step_size(scheme, iteration, max_step_size, threshold)
+                    self.comm_graph[i].select_step_size(scheme, iteration, max_step_size, thresholds[i])
                     
                     if(beta_true is not None):
                         F1_history[i].append(F1(confusion_matrix(beta_true, self.comm_graph[i].beta_curr)))
@@ -89,7 +89,7 @@ class Communication_Network:
                 self.BROADCAST()
                 for i in range(self.K):
                     self.comm_graph[i].update_trust(trust_params)
-                    self.comm_graph[i].select_step_size(scheme, iteration, max_step_size, threshold)
+                    self.comm_graph[i].select_step_size(scheme, iteration, max_step_size, thresholds[i])
                     self.comm_graph[i].update_betas_old()
                     
                     if(beta_true is not None):
