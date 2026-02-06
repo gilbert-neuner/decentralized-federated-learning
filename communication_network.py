@@ -1,37 +1,52 @@
 import numpy as np
-from numpy import linalg as LA
 from client import Client, Adversary
-from diagnostic import confusion_matrix, F1, rel_norm
+from generate_data import generate_adj_mtx
 
+def unpack_params(param_dict, k = 0):
+    out = {}
+    for key, val in param_dict.items():
+        try:
+            out[key] = val[k]
+            if isinstance(out[key], str):
+                out[key] = val
+        except Exception:
+            out[key] = val
+    return out
+        
 class Communication_Network:
+    # data_params: n, p, SNR, sparsity, beta_true
     # topology_params: adjacency_matrix
-    # data_params: X, Y
-    # adversary_params: which_adversaries, corrupt_fraction
-    def __init__(self, topology_params, data_params, adversary_params):
-        adjacency_matrix = topology_params["adjacency_matrix"]
-        X = data_params["X"]
-        Y = data_params["Y"]
+    # algorithm_params: scheme, max_step_size, n_iter, threshold, beta0, random_displace, winsorize
+    # trust_params: info, accelerate, cosine_recompute, include
+    # adversary_params: which_adversaries, corrupt_fraction, adversary_type
+    def __init__(self, data_params, topology_params, algorithm_params = {}, trust_params = {}, adversary_params = {}):
+        # topology_params
+        self.adjacency_matrix = topology_params.get("adjacency_matrix", generate_adj_mtx())
+        self.K = np.shape(self.adjacency_matrix)[0]
         self.comm_graph = []
-        self.K = np.shape(adjacency_matrix)[0]
-        self.p = np.shape(X[0])[1]
-        which_adversaries = adversary_params["which_adversaries"]
+        # algorithm_params
+        self.algorithm_params = algorithm_params
+        # adversary_params
+        self.which_adversaries = adversary_params.get("which_adversaries", range(int(np.floor(self.K / 2)), self.K))
+        self.which_friendly = [i for i in range(self.K) if i not in self.which_adversaries]
+        # initialize each client
         for k in range(self.K):
-            neighbors = list(np.where(adjacency_matrix[k, :] == 1)[0])
-            topology_params = {"client_id": k, "neighbors": neighbors}
-            data_params = {"X": X[k], "Y": Y[k]}
-            if(k in which_adversaries):
-                corrupt_fraction = adversary_params["corrupt_fraction"]
-                # adversary_type = adversary_params["adversary_type"]
-                # corrupt_coefficient = adversary_params["corrupt_coefficient"]
-                if(isinstance(corrupt_fraction, dict)):
-                    adversary_params_k = adversary_params
-                    adversary_params["corrupt_fraction"] = adversary_params["corrupt_fraction"][k]
-                    self.comm_graph.append(Adversary(topology_params = topology_params, data_params = data_params, adversary_params = adversary_params_k))
-                else:
-                    self.comm_graph.append(Adversary(topology_params = topology_params, data_params = data_params, adversary_params = adversary_params))
+            # client data_params
+            data_params_k = unpack_params(data_params, k)
+            # client topology_params
+            neighbors = list(np.where(self.adjacency_matrix[k, :] == 1)[0])
+            topology_params_k = {"client_id": k, "neighbors": neighbors}
+            # client algorithm_params
+            algorithm_params_k = unpack_params(algorithm_params, k)
+            # client trust_params
+            trust_params_k = unpack_params(trust_params, k)
+            # client adversary_params
+            adversary_params_k = unpack_params(adversary_params, k)
+            if(k in self.which_adversaries):
+                self.comm_graph.append(Adversary(data_params_k, topology_params_k, algorithm_params_k, trust_params_k, adversary_params_k))
             else:
-                self.comm_graph.append(Client(topology_params = topology_params, data_params = data_params))
-            
+                self.comm_graph.append(Client(data_params_k, topology_params_k, algorithm_params_k, trust_params_k))
+                
     def BROADCAST(self):
         for i in range(self.K):
             self.comm_graph[i].compute_gradient()
@@ -39,63 +54,12 @@ class Communication_Network:
                 self.comm_graph[j].betas_temp[i] = np.copy(self.comm_graph[i].betas_temp[i]) # models
                 self.comm_graph[j].gradients[i] = np.copy(self.comm_graph[i].gradients[i]) # gradients
                 
-    # start_params: start, beta0
-    def initialize_start(self, start_params):
-        start = start_params["start"]
-        beta0 = start_params["beta0"]
-        if(beta0 is None):
-            beta0 = np.zeros(self.p)
-        if(start == "identical"):
+    def run_algorithm(self):
+        for iteration in range(unpack_params(self.algorithm_params).get("n_iter", 100)):
+            self.BROADCAST()
             for k in range(self.K):
-                self.comm_graph[k].beta_curr = beta0
-                self.comm_graph[k].betas_temp[k] = beta0
-        elif(start == "random"):
-            for k in range(self.K):
-                displacement = np.random.uniform(-1, 1, self.p)
-                displacement *= 5 / LA.norm(displacement)
-                self.comm_graph[k].beta_curr = beta0 + displacement
-                self.comm_graph[k].betas_temp[k] = beta0 + displacement
-    
-    # algorithm_params: scheme, max_step_size, n_iter, thresholds
-    # start_params: start, beta0
-    # trust_params: info, accelerate, include
-    # diagnostic_params: beta_true
-    def run_algorithm(self, algorithm_params, start_params, trust_params, diagnostic_params):
-        scheme = algorithm_params["scheme"]
-        max_step_size = algorithm_params["max_step_size"]
-        n_iter = algorithm_params["n_iter"]
-        thresholds = algorithm_params["thresholds"]
-        start = start_params["start"]
-        beta0 = start_params["beta0"]
-        beta_true = diagnostic_params["beta_true"]
-        
-        self.initialize_start(start_params)
-        F1_history = [[] for _ in range(self.K)]
-        rel_norm_history = [[] for _ in range(self.K)]
-        beta_history = [[] for _ in range(self.K)]
-        if(trust_params["info"] == "None"):
-            for iteration in range(n_iter):
-                self.BROADCAST()
-                for i in range(self.K):
-                    self.comm_graph[i].select_step_size(scheme, iteration, max_step_size, thresholds[i])
-                    
-                    if(beta_true is not None):
-                        F1_history[i].append(F1(confusion_matrix(beta_true, self.comm_graph[i].beta_curr)))
-                        rel_norm_history[i].append(rel_norm(beta_true, self.comm_graph[i].beta_curr))
-                    
-                    beta_history[i].append(self.comm_graph[i].beta_curr)
-        else:
-            for iteration in range(n_iter):
-                self.BROADCAST()
-                for i in range(self.K):
-                    self.comm_graph[i].update_trust(trust_params)
-                    self.comm_graph[i].select_step_size(scheme, iteration, max_step_size, thresholds[i])
-                    self.comm_graph[i].update_betas_old()
-                    
-                    if(beta_true is not None):
-                        F1_history[i].append(F1(confusion_matrix(beta_true, self.comm_graph[i].beta_curr)))
-                        rel_norm_history[i].append(rel_norm(beta_true, self.comm_graph[i].beta_curr))
-                    
-                    beta_history[i].append(self.comm_graph[i].beta_curr)
-                    
-        return F1_history, rel_norm_history, beta_history
+                self.comm_graph[k].update_trust()
+                if self.comm_graph[k].winsorize > 0:
+                    self.comm_graph[k].WINSORIZE()
+                self.comm_graph[k].select_step_size()
+                self.comm_graph[k].update_betas_old()

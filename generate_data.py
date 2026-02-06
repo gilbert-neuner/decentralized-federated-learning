@@ -1,19 +1,24 @@
 import numpy as np
 import random
 
-def generate_beta_true(p, sparsity = 0.05):
+def generate_beta_true(p = 50, sparsity = 0.05):
     beta_support = random.sample(range(p), round(p * sparsity))
     beta_true = np.zeros(p)
     beta_true[beta_support, ] = 1
     return beta_true
 
-def generate_X_Y(n, beta_true, SNR = 1):
+def generate_X_Y(K, n, beta_true, SNR = 1):
+    X_out = []
+    Y_out = []
     p = np.shape(beta_true)[0]
     sigma = np.dot(beta_true, beta_true / SNR) ** 0.5
-    X = np.random.multivariate_normal(np.zeros(p), np.identity(p), n)
-    epsilon = np.random.normal(0, sigma, n)
-    Y = X @ beta_true + epsilon
-    return X, Y
+    for k in range(K): 
+        X = np.random.multivariate_normal(np.zeros(p), np.identity(p), n)
+        epsilon = np.random.normal(0, sigma, n)
+        Y = X @ beta_true + epsilon
+        X_out.append(X)
+        Y_out.append(Y)
+    return X_out, Y_out
 
 # reminder: self-neighbors
 def generate_adj_mtx(K = 10, shape = "mesh", thickness = 0):
