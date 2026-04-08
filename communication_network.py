@@ -18,7 +18,7 @@ class Communication_Network:
     # topology_params: adjacency_matrix
     # algorithm_params: scheme, max_step_size, n_iter, threshold, beta0, random_displace, winsorize
     # trust_params: info, accelerate, cosine_recompute, include
-    # adversary_params: which_adversaries, corrupt_fraction, adversary_type
+    # adversary_params: which_adversaries, corrupt_fraction, jitter, adversary_type
     def __init__(self, data_params, topology_params, algorithm_params = {}, trust_params = {}, adversary_params = {}):
         # topology_params
         self.adjacency_matrix = topology_params.get("adjacency_matrix", generate_adj_mtx())
@@ -27,7 +27,7 @@ class Communication_Network:
         # algorithm_params
         self.algorithm_params = algorithm_params
         # adversary_params
-        self.which_adversaries = adversary_params.get("which_adversaries", range(int(np.floor(self.K / 2)), self.K))
+        self.which_adversaries = adversary_params.get("which_adversaries", range(0, self.K, 2))
         self.which_friendly = [i for i in range(self.K) if i not in self.which_adversaries]
         # initialize each client
         for k in range(self.K):

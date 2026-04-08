@@ -9,10 +9,10 @@ import pandas as pd
 # topology_params: adjacency_matrix
 # algorithm_params: scheme, max_step_size, n_iter, threshold, beta0, random_displace, winsorize
 # trust_params: info, accelerate, cosine_recompute, include
-# adversary_params: which_adversaries, corrupt_fraction, adversary_type
+# adversary_params: which_adversaries, corrupt_fraction, jitter, adversary_type
 # rep_params: replicate, seed
 def replicate_algorithm(data_params = {}, topology_params = {}, algorithm_params = {}, trust_params = {}, adversary_params = {}, rep_params = {}):
-    df_out = pd.DataFrame(columns = ["scheme", "max_step_size", "n_iter", "threshold", "random_displace", "info", "accelerate", "include", "n", "p", "SNR", "sparsity", "adversary_type", "corrupt_fraction", "seed", "client_id", "F1", "beta_rel_norm", "Y_rel_norm"])
+    df_out = pd.DataFrame(columns = ["scheme", "max_step_size", "n_iter", "threshold", "random_displace", "info", "accelerate", "include", "n", "p", "SNR", "sparsity", "adversary_type", "corrupt_fraction", "jitter", "seed", "client_id", "F1", "beta_rel_norm", "Y_rel_norm"])
     # data_params
     n = data_params.get("n", 50)
     p = data_params.get("p", 100)
@@ -53,6 +53,7 @@ def replicate_algorithm(data_params = {}, topology_params = {}, algorithm_params
         new_row["sparsity"] = [sparsity]
         new_row["adversary_type"] = [comm_graph.comm_graph[k].adversary_type]
         new_row["corrupt_fraction"] = [comm_graph.comm_graph[k].corrupt_fraction]
+        new_row["jitter"] = [comm_graph.comm_graph[k].jitter]
         new_row["seed"] = [replicate + seed]
         new_row["client_id"] = [comm_graph.comm_graph[k].client_id]
         new_row["F1"] = [F1(confusion_matrix(beta_true, comm_graph.comm_graph[k].beta_curr))]
@@ -70,7 +71,7 @@ def replicate_algorithm(data_params = {}, topology_params = {}, algorithm_params
 # topology_params: adjacency_matrix
 # algorithm_params: scheme, max_step_size, n_iter, beta0, random_displace
 # trust_params: info, accelerate, cosine_recompute, include
-# adversary_params: which_adversaries, corrupt_fraction, adversary_type
+# adversary_params: which_adversaries, corrupt_fraction, jitter, adversary_type
 # grid_params: n_rep, seed, grid, shared_threshold, metric
 
 def grid_search(data_params = {}, topology_params = {}, algorithm_params = {}, trust_params = {}, adversary_params = {}, grid_params = {}):

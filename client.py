@@ -91,6 +91,7 @@ class Client:
         ranks = {k: (rank + 1) / len(d) for rank, (k, v) in enumerate(sorted_items)}
         return ranks
     
+    # TODO: can speed this up by ignoring norms
     def judge_cosines(self):
         cosines = self.cosine_similarity()
         cosine_ranks = self.rank_dict(cosines, desc = True)
@@ -186,6 +187,7 @@ class Client:
             
     # ALGORITHM STEPS
     
+    # TODO: should I be dividing by number of neighbors or sum of trust?
     def AGGREGATE(self, step_size):
         aggregated_gradient = np.zeros_like(self.gradients[self.client_id])
         for j in self.neighbors:
@@ -412,11 +414,17 @@ class Adversary(Client):
         p = np.shape(data_params["X"])[1]
         X_jitter = np.random.multivariate_normal(np.zeros(p), jitter * np.identity(p), n)
         if adversary_type == "X":
-            data_params["X"].flat[random.sample(range(n * p), round(n * p * corrupt_fraction))] *= -1
+            corrupt_index = random.sample(range(n * p), round(n * p * corrupt_fraction))
+            data_params["X"].flat[corrupt_index] *= -1
+            data_params["X"].flat[corrupt_index] += X_jitter.flat[corrupt_index]
         elif adversary_type == "X_cols":
-            data_params["X"][:, random.sample(range(p), round(p * corrupt_fraction))] *= -1
+            corrupt_index = random.sample(range(p), round(p * corrupt_fraction))
+            data_params["X"][:, corrupt_index] *= -1
+            data_params["X"][:, corrupt_index] += X_jitter[:, corrupt_index]
         elif adversary_type == "X_rows":
-            data_params["X"][random.sample(range(n), round(n * corrupt_fraction)), :] *= -1
+            corrupt_index = random.sample(range(n), round(n * corrupt_fraction))
+            data_params["X"][corrupt_index, :] *= -1
+            data_params["X"][corrupt_index, :] += X_jitter[corrupt_index, :]
         super().__init__(data_params, topology_params, algorithm_params, trust_params)
         # adversary_params
         self.adversary_type = adversary_type
