@@ -91,7 +91,6 @@ class Client:
         ranks = {k: (rank + 1) / len(d) for rank, (k, v) in enumerate(sorted_items)}
         return ranks
     
-    # TODO: can speed this up by ignoring norms
     def judge_cosines(self):
         cosines = self.cosine_similarity()
         cosine_ranks = self.rank_dict(cosines, desc = True)
@@ -188,38 +187,46 @@ class Client:
     # ALGORITHM STEPS
     
     # TODO: should I be dividing by number of neighbors or sum of trust?
-    def AGGREGATE(self, step_size):
+    def FEDSGD(self, step_size):
         aggregated_gradient = np.zeros_like(self.gradients[self.client_id])
+        trust_sum = 0
         for j in self.neighbors:
             aggregated_gradient += self.trust[j] * self.normalize_magnitude(self.gradients[j], self.gradients[self.client_id])
-        self.betas_temp[self.client_id] -= step_size * aggregated_gradient / len(self.neighbors)
+            trust_sum += self.trust[j]
+        self.betas_temp[self.client_id] -= step_size * aggregated_gradient / trust_sum
         
-    def CONSENSUS(self, step_size):
+    def FEDAVG(self, step_size):
         aggregated_diff = np.zeros_like(self.betas_temp[self.client_id])
+        trust_sum = 0
         for j in self.neighbors:
             aggregated_diff += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
-        self.betas_temp[self.client_id] += step_size * aggregated_diff / len(self.neighbors)
+            trust_sum += self.trust[j]
+        self.betas_temp[self.client_id] += step_size * aggregated_diff / trust_sum
         
-    def AGGREGATE_CONSENSUS(self, step_size):
+    def AVG_AND_SGD(self, step_size):
         aggregated_suggestion = np.zeros_like(self.gradients[self.client_id])
+        trust_sum = 0
         for j in self.neighbors:
             aggregated_suggestion -= self.trust[j] * self.normalize_magnitude(self.gradients[j], self.gradients[self.client_id])
             aggregated_suggestion += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
-        self.betas_temp[self.client_id] += step_size * aggregated_suggestion / (2 * len(self.neighbors))
+            trust_sum += self.trust[j]
+        self.betas_temp[self.client_id] += step_size * aggregated_suggestion / (2 * trust_sum)
         
-    def GRADIENT(self, step_size, everybody = False):
+    def GRADIENT_DESCENT(self, step_size, everybody = False):
         if(everybody):
             for j in self.neighbors:
                 self.betas_temp[j] -= step_size * self.gradients[j]
         else:
             self.betas_temp[self.client_id] -= step_size * self.gradients[self.client_id]
         
-    def GRADIENT_CONSENSUS(self, step_size):
+    def AVG_AND_GD(self, step_size):
         aggregated_suggestion = np.zeros_like(self.betas_temp[self.client_id])
+        trust_sum = 0
         for j in self.neighbors:
             aggregated_suggestion += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
+            trust_sum += self.trust[j]
         aggregated_suggestion -= len(self.neighbors) * self.gradients[self.client_id]
-        self.betas_temp[self.client_id] += aggregated_suggestion / (2 * len(self.neighbors))
+        self.betas_temp[self.client_id] += aggregated_suggestion / (len(self.neighbors) + trust_sum)
         
     def THRESHOLD(self, step_size):
         self.betas_temp[self.client_id] = np.sign(self.betas_temp[self.client_id]) * np.maximum(np.abs(self.betas_temp[self.client_id]) - step_size * self.threshold, 0.0)
@@ -256,13 +263,13 @@ class Client:
         if self.scheme == "G":
             while b - a > 1 / (self.curr_iter + 1):
                 c = b - (b - a) * invphi
-                self.GRADIENT(c)
+                self.GRADIENT_DESCENT(c)
                 self.THRESHOLD(c)
                 fc = self.objective_function()
                 self.reset_beta_temp()
                 
                 d = a + (b - a) * invphi
-                self.GRADIENT(d)
+                self.GRADIENT_DESCENT(d)
                 self.THRESHOLD(d)
                 fd = self.objective_function()
                 self.reset_beta_temp()
@@ -271,20 +278,20 @@ class Client:
                     b = d
                 else:
                     a = c        
-            self.GRADIENT((a + b) / 2)
+            self.GRADIENT_DESCENT((a + b) / 2)
             self.THRESHOLD((a + b) / 2)
             self.update_beta_curr()
             self.reset_beta_temp()
-        elif self.scheme == "A":
+        elif self.scheme == "S":
             while b - a > 1 / (self.curr_iter + 1):
                 c = b - (b - a) * invphi
-                self.AGGREGATE(c)
+                self.FEDSGD(c)
                 self.THRESHOLD(c)
                 fc = self.objective_function()
                 self.reset_beta_temp()
                 
                 d = a + (b - a) * invphi
-                self.AGGREGATE(d)
+                self.FEDSGD(d)
                 self.THRESHOLD(d)
                 fd = self.objective_function()
                 self.reset_beta_temp()
@@ -293,20 +300,20 @@ class Client:
                     b = d
                 else:
                     a = c   
-            self.AGGREGATE((a + b) / 2)
+            self.FEDSGD((a + b) / 2)
             self.THRESHOLD((a + b) / 2)
             self.update_beta_curr()
             self.reset_beta_temp()
-        elif self.scheme == "(AC)":
+        elif self.scheme == "AS":
             while b - a > 1 / (self.curr_iter + 1):
                 c = b - (b - a) * invphi
-                self.AGGREGATE_CONSENSUS(c)
+                self.AVG_AND_SGD(c)
                 self.THRESHOLD(c)
                 fc = self.objective_function()
                 self.reset_beta_temp()
                 
                 d = a + (b - a) * invphi
-                self.AGGREGATE_CONSENSUS(d)
+                self.AVG_AND_SGD(d)
                 self.THRESHOLD(d)
                 fd = self.objective_function()
                 self.reset_beta_temp()
@@ -315,24 +322,24 @@ class Client:
                     b = d
                 else:
                     a = c        
-            self.AGGREGATE_CONSENSUS((a + b) / 2)
+            self.AVG_AND_SGD((a + b) / 2)
             self.THRESHOLD((a + b) / 2)
             self.update_beta_curr()
             self.reset_beta_temp()
-        elif self.scheme == "CG":
+        elif self.scheme == "A,G":
             while b - a > 1 / (self.curr_iter + 1):
                 c = b - (b - a) * invphi
-                self.CONSENSUS(c)
+                self.FEDAVG(c)
                 self.compute_gradient()
-                self.GRADIENT(c)
+                self.GRADIENT_DESCENT(c)
                 self.THRESHOLD(c)
                 fc = self.objective_function()
                 self.reset_beta_temp()
                 
                 d = a + (b - a) * invphi
-                self.CONSENSUS(d)
+                self.FEDAVG(d)
                 self.compute_gradient()
-                self.GRADIENT(d)
+                self.GRADIENT_DESCENT(d)
                 self.THRESHOLD(d)
                 fd = self.objective_function()
                 self.reset_beta_temp()
@@ -341,24 +348,24 @@ class Client:
                     b = d
                 else:
                     a = c        
-            self.CONSENSUS((a + b) / 2)
+            self.FEDAVG((a + b) / 2)
             self.compute_gradient()
-            self.GRADIENT((a + b) / 2)
+            self.GRADIENT_DESCENT((a + b) / 2)
             self.THRESHOLD((a + b) / 2)
             self.update_beta_curr()
             self.reset_beta_temp()
-        elif self.scheme == "GC":
+        elif self.scheme == "G,A":
             while b - a > 1 / (self.curr_iter + 1):
                 c = b - (b - a) * invphi
-                self.GRADIENT(c, True)
-                self.CONSENSUS(c)
+                self.GRADIENT_DESCENT(c, True)
+                self.FEDAVG(c)
                 self.THRESHOLD(c)
                 fc = self.objective_function()
                 self.reset_beta_temp()
                 
                 d = a + (b - a) * invphi
-                self.GRADIENT(d, True)
-                self.CONSENSUS(d)
+                self.GRADIENT_DESCENT(d, True)
+                self.FEDAVG(d)
                 self.THRESHOLD(d)
                 fd = self.objective_function()
                 self.reset_beta_temp()
@@ -367,21 +374,21 @@ class Client:
                     b = d
                 else:
                     a = c        
-            self.GRADIENT((a + b) / 2, True)
-            self.CONSENSUS((a + b) / 2)
+            self.GRADIENT_DESCENT((a + b) / 2, True)
+            self.FEDAVG((a + b) / 2)
             self.THRESHOLD((a + b) / 2)
             self.update_beta_curr()
             self.reset_beta_temp()
-        elif self.scheme == "(GC)":
+        elif self.scheme == "AG":
             while b - a > 1 / (self.curr_iter + 1):
                 c = b - (b - a) * invphi
-                self.GRADIENT_CONSENSUS(c)
+                self.AVG_AND_GD(c)
                 self.THRESHOLD(c)
                 fc = self.objective_function()
                 self.reset_beta_temp()
                 
                 d = a + (b - a) * invphi
-                self.GRADIENT_CONSENSUS(d)
+                self.AVG_AND_GD(d)
                 self.THRESHOLD(d)
                 fd = self.objective_function()
                 self.reset_beta_temp()
@@ -390,7 +397,7 @@ class Client:
                     b = d
                 else:
                     a = c        
-            self.GRADIENT_CONSENSUS((a + b) / 2)
+            self.AVG_AND_GD((a + b) / 2)
             self.THRESHOLD((a + b) / 2)
             self.update_beta_curr()
             self.reset_beta_temp()
@@ -438,13 +445,13 @@ class Adversary(Client):
 
         while b - a > 1 / (self.curr_iter + 1):
             c = b - (b - a) * invphi
-            self.GRADIENT(c)
+            self.GRADIENT_DESCENT(c)
             self.THRESHOLD(c)
             fc = self.objective_function()
             self.reset_beta_temp()
             
             d = a + (b - a) * invphi
-            self.GRADIENT(d)
+            self.GRADIENT_DESCENT(d)
             self.THRESHOLD(d)
             fd = self.objective_function()
             self.reset_beta_temp()
@@ -453,7 +460,7 @@ class Adversary(Client):
                 b = d
             else:
                 a = c        
-        self.GRADIENT((a + b) / 2)
+        self.GRADIENT_DESCENT((a + b) / 2)
         self.THRESHOLD((a + b) / 2)
         self.update_beta_curr()
         self.reset_beta_temp()
