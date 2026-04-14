@@ -7,7 +7,7 @@ class Client:
     
     # data_params: X, Y
     # topology_params: client_id, neighbors
-    # algorithm_params: scheme, max_step_size, n_iter, threshold, beta0, random_displace, winsorize
+    # algorithm_params: scheme, clip, max_step_size, n_iter, threshold, beta0, random_displace, winsorize
     # trust_params: info, accelerate, cosine_recompute, include
     # adversary_params: adversary_type, corrupt_fraction, jitter
     def __init__(self, data_params, topology_params, algorithm_params = {}, trust_params = {}):
@@ -21,6 +21,7 @@ class Client:
         self.neighbors = topology_params["neighbors"]
         # algorithm_params
         self.scheme = algorithm_params.get("scheme", "G")
+        self.clip = algorithm_params.get("clip", True)
         self.max_step_size = algorithm_params.get("max_step_size", 1)
         self.n_iter = algorithm_params.get("n_iter", 100)
         self.threshold = algorithm_params.get("threshold", 0.1)
@@ -186,31 +187,34 @@ class Client:
             
     # ALGORITHM STEPS
     
-    # TODO: should I be dividing by number of neighbors or sum of trust?
     def FEDSGD(self, step_size):
         aggregated_gradient = np.zeros_like(self.gradients[self.client_id])
-        trust_sum = 0
         for j in self.neighbors:
-            aggregated_gradient += self.trust[j] * self.normalize_magnitude(self.gradients[j], self.gradients[self.client_id])
-            trust_sum += self.trust[j]
-        self.betas_temp[self.client_id] -= step_size * aggregated_gradient / trust_sum
+            if self.clip:
+                aggregated_gradient += self.trust[j] * self.normalize_magnitude(self.gradients[j], self.gradients[self.client_id])
+            else:
+                aggregated_gradient += self.trust[j] * self.gradients[j]
+        self.betas_temp[self.client_id] -= step_size * aggregated_gradient / len(self.neighbors)
         
     def FEDAVG(self, step_size):
         aggregated_diff = np.zeros_like(self.betas_temp[self.client_id])
-        trust_sum = 0
         for j in self.neighbors:
-            aggregated_diff += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
-            trust_sum += self.trust[j]
-        self.betas_temp[self.client_id] += step_size * aggregated_diff / trust_sum
+            if self.clip:
+                aggregated_diff += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
+            else:
+                aggregated_diff += self.trust[j] * (self.betas_temp[j] - self.betas_temp[self.client_id])
+        self.betas_temp[self.client_id] += step_size * aggregated_diff / len(self.neighbors)
         
     def AVG_AND_SGD(self, step_size):
         aggregated_suggestion = np.zeros_like(self.gradients[self.client_id])
-        trust_sum = 0
         for j in self.neighbors:
-            aggregated_suggestion -= self.trust[j] * self.normalize_magnitude(self.gradients[j], self.gradients[self.client_id])
-            aggregated_suggestion += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
-            trust_sum += self.trust[j]
-        self.betas_temp[self.client_id] += step_size * aggregated_suggestion / (2 * trust_sum)
+            if self.clip:
+                aggregated_suggestion -= self.trust[j] * self.normalize_magnitude(self.gradients[j], self.gradients[self.client_id])
+                aggregated_suggestion += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
+            else:
+                aggregated_suggestion -= self.trust[j] * self.gradients[j]
+                aggregated_suggestion += self.trust[j] * (self.betas_temp[j] - self.betas_temp[self.client_id])
+        self.betas_temp[self.client_id] += step_size * aggregated_suggestion / (2 * len(self.neighbors))
         
     def GRADIENT_DESCENT(self, step_size, everybody = False):
         if(everybody):
@@ -221,12 +225,13 @@ class Client:
         
     def AVG_AND_GD(self, step_size):
         aggregated_suggestion = np.zeros_like(self.betas_temp[self.client_id])
-        trust_sum = 0
         for j in self.neighbors:
-            aggregated_suggestion += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
-            trust_sum += self.trust[j]
+            if self.clip:
+                aggregated_suggestion += self.trust[j] * self.normalize_magnitude(self.betas_temp[j] - self.betas_temp[self.client_id], self.gradients[self.client_id])
+            else:
+                aggregated_suggestion += self.trust[j] * (self.betas_temp[j] - self.betas_temp[self.client_id])
         aggregated_suggestion -= len(self.neighbors) * self.gradients[self.client_id]
-        self.betas_temp[self.client_id] += aggregated_suggestion / (len(self.neighbors) + trust_sum)
+        self.betas_temp[self.client_id] += step_size * aggregated_suggestion / (2 * len(self.neighbors))
         
     def THRESHOLD(self, step_size):
         self.betas_temp[self.client_id] = np.sign(self.betas_temp[self.client_id]) * np.maximum(np.abs(self.betas_temp[self.client_id]) - step_size * self.threshold, 0.0)

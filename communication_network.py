@@ -16,7 +16,7 @@ def unpack_params(param_dict, k = 0):
 class Communication_Network:
     # data_params: n, p, SNR, sparsity, beta_true
     # topology_params: adjacency_matrix
-    # algorithm_params: scheme, max_step_size, n_iter, threshold, beta0, random_displace, winsorize
+    # algorithm_params: scheme, clip, max_step_size, n_iter, threshold, beta0, random_displace, winsorize
     # trust_params: info, accelerate, cosine_recompute, include
     # adversary_params: which_adversaries, corrupt_fraction, jitter, adversary_type
     def __init__(self, data_params, topology_params, algorithm_params = {}, trust_params = {}, adversary_params = {}):

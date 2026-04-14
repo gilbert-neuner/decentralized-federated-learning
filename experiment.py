@@ -7,7 +7,7 @@ import pandas as pd
             
 # data_params: n, p, SNR, sparsity
 # topology_params: adjacency_matrix
-# algorithm_params: scheme, max_step_size, n_iter, threshold, beta0, random_displace, winsorize
+# algorithm_params: scheme, clip, max_step_size, n_iter, threshold, beta0, random_displace, winsorize
 # trust_params: info, accelerate, cosine_recompute, include
 # adversary_params: which_adversaries, corrupt_fraction, jitter, adversary_type
 # rep_params: replicate, seed
@@ -39,6 +39,7 @@ def replicate_algorithm(data_params = {}, topology_params = {}, algorithm_params
     for k in range(K):
         new_row = {}
         new_row["scheme"] = [comm_graph.comm_graph[k].scheme]
+        new_row["clip"] = [comm_graph.comm_graph[k].clip]
         new_row["max_step_size"] = [comm_graph.comm_graph[k].max_step_size]
         new_row["n_iter"] = [comm_graph.comm_graph[k].n_iter]
         new_row["threshold"] = [comm_graph.comm_graph[k].threshold]
@@ -69,7 +70,7 @@ def replicate_algorithm(data_params = {}, topology_params = {}, algorithm_params
 
 # data_params: n, p, SNR, sparsity
 # topology_params: adjacency_matrix
-# algorithm_params: scheme, max_step_size, n_iter, beta0, random_displace
+# algorithm_params: scheme, clip, max_step_size, n_iter, beta0, random_displace
 # trust_params: info, accelerate, cosine_recompute, include
 # adversary_params: which_adversaries, corrupt_fraction, jitter, adversary_type
 # grid_params: n_rep, seed, grid, shared_threshold, metric
