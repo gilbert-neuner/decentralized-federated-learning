@@ -1,7 +1,7 @@
 import numpy as np
 import random
 
-def generate_beta_true(p = 50, sparsity = 0.05):
+def generate_beta_true(p = 100, sparsity = 0.05):
     beta_support = random.sample(range(p), round(p * sparsity))
     beta_true = np.zeros(p)
     beta_true[beta_support, ] = 1
