@@ -265,7 +265,7 @@ class Client:
         a = 0
         b = self.max_step_size
         
-        if self.scheme == "G":
+        if self.scheme == "G" or self.scheme == "global":
             while b - a > 1 / (self.curr_iter + 1):
                 c = b - (b - a) * invphi
                 self.GRADIENT_DESCENT(c)
@@ -359,7 +359,7 @@ class Client:
             self.THRESHOLD((a + b) / 2)
             self.update_beta_curr()
             self.reset_beta_temp()
-        elif self.scheme == "G,A":
+        elif self.scheme == "G,A" or self.scheme == "D-SGD" or self.scheme == "ClippedGossip":
             while b - a > 1 / (self.curr_iter + 1):
                 c = b - (b - a) * invphi
                 self.GRADIENT_DESCENT(c, True)
@@ -384,7 +384,7 @@ class Client:
             self.THRESHOLD((a + b) / 2)
             self.update_beta_curr()
             self.reset_beta_temp()
-        elif self.scheme == "AG":
+        elif self.scheme == "AG" or self.scheme == "D-PSGD":
             while b - a > 1 / (self.curr_iter + 1):
                 c = b - (b - a) * invphi
                 self.AVG_AND_GD(c)

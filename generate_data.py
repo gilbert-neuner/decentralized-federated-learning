@@ -7,7 +7,7 @@ def generate_beta_true(p = 100, sparsity = 0.05):
     beta_true[beta_support, ] = 1
     return beta_true
 
-def generate_X_Y(K, n, beta_true, SNR = 1):
+def generate_X_Y(K, n, beta_true, SNR = 1, concatenate = False):
     X_out = []
     Y_out = []
     p = np.shape(beta_true)[0]
@@ -18,10 +18,13 @@ def generate_X_Y(K, n, beta_true, SNR = 1):
         Y = X @ beta_true + epsilon
         X_out.append(X)
         Y_out.append(Y)
+    if concatenate:
+        X_out = np.concatenate(X_out)
+        Y_out = np.concatenate(Y_out)
     return X_out, Y_out
 
 # reminder: self-neighbors
-def generate_adj_mtx(K = 10, shape = "mesh", thickness = 0):
+def generate_adj_mtx(K = 10, shape = "band", thickness = 0):
     if shape == "mesh":
         adjacency_matrix = np.ones([K, K], dtype = int)
     elif shape == "line":

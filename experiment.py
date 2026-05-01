@@ -6,7 +6,7 @@ from diagnostic import confusion_matrix, F1, rel_norm
 import pandas as pd
             
 # data_params: n, p, SNR, sparsity
-# topology_params: adjacency_matrix
+# topology_params: adjacency_matrix OR K, shape, thickness
 # algorithm_params: scheme, clip, max_step_size, n_iter, threshold, beta0, random_displace, winsorize
 # trust_params: info, accelerate, cosine_recompute, include
 # adversary_params: which_adversaries, corrupt_fraction, jitter, adversary_type
@@ -19,7 +19,10 @@ def replicate_algorithm(data_params = {}, topology_params = {}, algorithm_params
     SNR = data_params.get("SNR", 1)
     sparsity = data_params.get("sparsity", 0.05)
     # topology_params
-    adjacency_matrix = topology_params.get("adjacency_matrix", generate_adj_mtx())
+    K = topology_params.get("K", 10)
+    shape = topology_params.get("shape", "band")
+    thickness = topology_params.get("thickness", K//2)
+    adjacency_matrix = topology_params.get("adjacency_matrix", generate_adj_mtx(K, shape, thickness))
     K = np.shape(adjacency_matrix)[0]
     trust_out = np.zeros([K, K])
     # rep_params
@@ -31,7 +34,11 @@ def replicate_algorithm(data_params = {}, topology_params = {}, algorithm_params
     np.random.seed(replicate + seed)
     # data_params
     beta_true = generate_beta_true(p, sparsity)
-    X, Y = generate_X_Y(K, n, beta_true, SNR)
+    if algorithm_params.get("scheme", "G") == "global":
+        X, Y = generate_X_Y(K, n, beta_true, SNR, concatenate = True)
+        K = 1
+    else:
+        X, Y = generate_X_Y(K, n, beta_true, SNR)
     data_params_curr = {"X": X, "Y": Y}
     comm_graph = Communication_Network(data_params_curr, topology_params, algorithm_params, trust_params, adversary_params)
     comm_graph.run_algorithm()
@@ -77,30 +84,33 @@ def replicate_algorithm(data_params = {}, topology_params = {}, algorithm_params
 
 def grid_search(data_params = {}, topology_params = {}, algorithm_params = {}, trust_params = {}, adversary_params = {}, grid_params = {}):
     # topology_params
-    adjacency_matrix = topology_params.get("adjacency_matrix", generate_adj_mtx())
+    K = topology_params.get("K", 10)
+    shape = topology_params.get("shape", "band")
+    thickness = topology_params.get("thickness", K//2)
+    adjacency_matrix = topology_params.get("adjacency_matrix", generate_adj_mtx(K, shape, thickness))
     K = np.shape(adjacency_matrix)[0]
     # grid_params
-    n_rep = grid_params.get("n_rep", 1)
+    n_rep = grid_params.get("n_rep", 3)
     seed = grid_params.get("seed", 1234)
-    grid = grid_params.get("grid", 10 ** np.arange(-1, 1.1, 0.5))
+    grid = grid_params.get("grid", 10 ** np.arange(-2, 0.1, 0.5))
     MEASUREMENTS = np.zeros([len(grid), K])
     shared_threshold = grid_params.get("shared_threshold", False)
-    metric = grid_params.get("metric", "Y")
+    metric = grid_params.get("metric", "beta_rel_norm")
     
     for replicate in range(n_rep):
-        for threshold in grid:
-            algorithm_params["threshold"] = threshold
+        for threshold_idx in range(len(grid)):
+            algorithm_params["threshold"] = grid[threshold_idx]
             rep_params = {"replicate": replicate, "seed": seed}
             df_out, _, _ = replicate_algorithm(data_params, topology_params, algorithm_params, trust_params, adversary_params, rep_params)
             # adversary_params
             which_friendly = df_out.index[df_out["adversary_type"] == "friendly"]
             for k in which_friendly:
                 if metric == "F1":
-                    MEASUREMENTS[threshold, k] += df_out.loc[k, "F1"]
+                    MEASUREMENTS[threshold_idx, k] += df_out.loc[k, "F1"]
                 elif metric == "beta_rel_norm":
-                    MEASUREMENTS[threshold, k] += df_out.loc[k, "beta_rel_norm"]
+                    MEASUREMENTS[threshold_idx, k] += df_out.loc[k, "beta_rel_norm"]
                 elif metric == "Y_rel_norm":
-                    MEASUREMENTS[threshold, k] += df_out.loc[k, "Y_rel_norm"]
+                    MEASUREMENTS[threshold_idx, k] += df_out.loc[k, "Y_rel_norm"]
             
         print(round(100 * (replicate + 1) / n_rep), "%")
         
