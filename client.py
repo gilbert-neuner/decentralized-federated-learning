@@ -419,7 +419,7 @@ class Adversary(Client):
     # adversary_params: adversary_type, corrupt_fraction, jitter
     def __init__(self, data_params, topology_params, algorithm_params = {}, trust_params = {}, adversary_params = {}): 
         # adversary_params
-        adversary_type = adversary_params.get("adversary_type", "X")
+        adversary_type = adversary_params.get("adversary_type", "Y")
         corrupt_fraction = adversary_params.get("corrupt_fraction", 1)
         jitter = adversary_params.get("jitter", 0)        
         n = np.shape(data_params["X"])[0]
@@ -437,11 +437,23 @@ class Adversary(Client):
             corrupt_index = random.sample(range(n), round(n * corrupt_fraction))
             data_params["X"][corrupt_index, :] *= -1
             data_params["X"][corrupt_index, :] += X_jitter[corrupt_index, :]
+        elif adversary_type == "Y":
+            corrupt_index = random.sample(range(n), round(n * corrupt_fraction))
+            data_params["Y"][corrupt_index] *= -1
+        elif adversary_type == "g":
+            self.corrupt_index = random.sample(range(p), round(p * corrupt_fraction))
         super().__init__(data_params, topology_params, algorithm_params, trust_params)
         # adversary_params
         self.adversary_type = adversary_type
         self.corrupt_fraction = corrupt_fraction
         self.jitter = jitter
+        
+    def compute_gradient(self):
+        if self.adversary_type == "g":
+            self.gradients[self.client_id] = np.transpose(self.X) @ (self.X @ self.betas_temp[self.client_id] - self.Y) / self.n
+            self.gradients[self.client_id][self.corrupt_index] *= -1
+        else:
+            self.gradients[self.client_id] = np.transpose(self.X) @ (self.X @ self.betas_temp[self.client_id] - self.Y) / self.n
         
     def select_step_size(self):
         invphi = (5 ** 0.5 - 1) / 2

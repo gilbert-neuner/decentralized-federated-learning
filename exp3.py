@@ -39,14 +39,48 @@ for (scheme, thickness, metric) in product(["D-SGD", "D-PSGD", "G", "ClippedGoss
 
 print("\a")
 
+# F1_out = (
+#     df_out
+#         .query("adversary_type == 'friendly' and metric == 'F1'")[["scheme", "thickness", "F1"]]
+# )
+
+# rel_norm_out = (
+#     df_out
+#         .query("adversary_type == 'friendly' and metric == 'beta_rel_norm'")[["scheme", "thickness", "beta_rel_norm"]]
+# )
+
+
+# precision_out = (
+#     df_out
+#         .query("adversary_type == 'friendly' and metric == 'F1'")[["scheme", "thickness", "precision"]]
+# )
+
+
+# recall_out = (
+#     df_out
+#         .query("adversary_type == 'friendly' and metric == 'F1'")[["scheme", "thickness", "recall"]]
+# )
+
 F1_out = (
     df_out
-        .query("adversary_type == 'friendly' and metric == 'F1'")[["scheme", "thickness", "F1"]]
+        .query("adversary_type == 'friendly' and metric == 'F1' and scheme in ['D-SGD', 'G', 'ClippedGossip', 'S', 'AS', 'global']")[["scheme", "thickness", "F1"]]
 )
 
 rel_norm_out = (
     df_out
-        .query("adversary_type == 'friendly' and metric == 'beta_rel_norm'")[["scheme", "thickness", "beta_rel_norm"]]
+        .query("adversary_type == 'friendly' and metric == 'beta_rel_norm' and scheme in ['D-SGD', 'G', 'ClippedGossip', 'S', 'AS', 'global']")[["scheme", "thickness", "beta_rel_norm"]]
+)
+
+
+precision_out = (
+    df_out
+        .query("adversary_type == 'friendly' and metric == 'F1' and scheme in ['D-SGD', 'G', 'ClippedGossip', 'S', 'AS', 'global']")[["scheme", "thickness", "precision"]]
+)
+
+
+recall_out = (
+    df_out
+        .query("adversary_type == 'friendly' and metric == 'F1' and scheme in ['D-SGD', 'G', 'ClippedGossip', 'S', 'AS', 'global']")[["scheme", "thickness", "recall"]]
 )
 
 color_map = {
@@ -62,7 +96,7 @@ color_map = {
     "global": "gold"
 }
 
-fig, axes = plt.subplots(1, 2)
+fig, axes = plt.subplots(2, 2, sharex = True, figsize = (12, 8), constrained_layout = True)
 
 sns.lineplot(
     data = F1_out,
@@ -71,7 +105,7 @@ sns.lineplot(
     hue = "scheme",
     palette = color_map,
     errorbar = "se",
-    ax = axes[0]
+    ax = axes[0, 0]
 )
 
 sns.lineplot(
@@ -81,23 +115,48 @@ sns.lineplot(
     hue = "scheme",
     palette = color_map,
     errorbar = "se",
-    ax = axes[1]
+    ax = axes[0, 1]
 )
 
-for ax in axes:
-    ax.legend_.remove()
-    
-handles, labels = axes[0].get_legend_handles_labels()
-    
-labels = ["D-SGD", "D-PSGD", "G (local)", "ClippedGossip", "AG", "A,G", "G,A", "S", "AS", "G (global)"]
-    
-fig.legend(handles, labels, loc = "center left", bbox_to_anchor = (1, 0.5))
+sns.lineplot(
+    data = precision_out,
+    x = "thickness",
+    y = "precision",
+    hue = "scheme",
+    palette = color_map,
+    errorbar = "se",
+    ax = axes[1, 0]
+)
 
-axes[0].set_xlabel(r"$\tau$")
-axes[1].set_xlabel(r"$\tau$")
-axes[1].set_ylabel("Relative Norm")
-fig.suptitle("Experiment 3: Effect of Thickness of Communication Graph")
+sns.lineplot(
+    data = recall_out,
+    x = "thickness",
+    y = "recall",
+    hue = "scheme",
+    palette = color_map,
+    errorbar = "se",
+    ax = axes[1, 1]
+)
 
-fig.subplots_adjust(wspace=0.3)
+for i in range(2):
+    for j in range(2):
+        axes[i, j].legend_.remove()
+    
+handles, labels = axes[0, 0].get_legend_handles_labels()
+    
+# labels = ["D-SGD", "D-PSGD", "G (local)", "ClippedGossip", "AG", "A,G", "G,A", "S", "AS", "G (global)"]
+labels = ["D-SGD", "G (local)", "ClippedGossip", "S", "AS", "G (global)"]
+    
+# fig.legend(handles, labels, loc = "lower center", ncol = 5, bbox_to_anchor = (0.5, -0.05))
+fig.legend(handles, labels, loc = "lower center", ncol = 6, bbox_to_anchor = (0.5, -0.025))
+
+axes[0, 0].set_xlabel(r"$\tau$")
+axes[0, 1].set_xlabel(r"$\tau$")
+axes[1, 0].set_xlabel(r"$\tau$")
+axes[1, 1].set_xlabel(r"$\tau$")
+axes[0, 1].set_ylabel("relative norm")
+fig.suptitle("Experiment 3: Effect of Connectivity")
+
+fig.subplots_adjust(bottom = 0.12)
 
 plt.tight_layout()

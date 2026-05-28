@@ -11,7 +11,7 @@ from experiment import grid_search, replicate_algorithm
 df_out = pd.DataFrame(columns = ["scheme", "clip", "max_step_size", "n_iter", "threshold", "random_displace", "winsorize", "info", "accelerate", "include", "n", "p", "SNR", "sparsity", "adversary_type", "corrupt_fraction", "jitter", "seed", "client_id", "F1", "beta_rel_norm", "Y_rel_norm", "metric", "corrupt_fraction_exp"])
 
 # data_params: n, p, SNR, sparsity
-# topology_params: adjacency_matri
+# topology_params: adjacency_matrix
 # algorithm_params: scheme, clip, max_step_size, n_iter, threshold, beta0, random_displace, winsorize
 # trust_params: info, accelerate, cosine_recompute, include
 # adversary_params: which_adversaries, corrupt_fraction, jitter, adversary_type
@@ -49,6 +49,40 @@ rel_norm_out = (
         .query("adversary_type == 'friendly' and metric == 'beta_rel_norm'")[["scheme", "corrupt_fraction_exp", "beta_rel_norm"]]
 )
 
+
+precision_out = (
+    df_out
+        .query("adversary_type == 'friendly' and metric == 'F1'")[["scheme", "corrupt_fraction_exp", "precision"]]
+)
+
+
+recall_out = (
+    df_out
+        .query("adversary_type == 'friendly' and metric == 'F1'")[["scheme", "corrupt_fraction_exp", "recall"]]
+)
+
+# F1_out = (
+#     df_out
+#         .query("adversary_type == 'friendly' and metric == 'F1' and scheme in ['D-SGD', 'G', 'ClippedGossip', 'S', 'AS', 'global']")[["scheme", "corrupt_fraction_exp", "F1"]]
+# )
+
+# rel_norm_out = (
+#     df_out
+#         .query("adversary_type == 'friendly' and metric == 'beta_rel_norm' and scheme in ['D-SGD', 'G', 'ClippedGossip', 'S', 'AS', 'global']")[["scheme", "corrupt_fraction_exp", "beta_rel_norm"]]
+# )
+
+
+# precision_out = (
+#     df_out
+#         .query("adversary_type == 'friendly' and metric == 'F1' and scheme in ['D-SGD', 'G', 'ClippedGossip', 'S', 'AS', 'global']")[["scheme", "corrupt_fraction_exp", "precision"]]
+# )
+
+
+# recall_out = (
+#     df_out
+#         .query("adversary_type == 'friendly' and metric == 'F1' and scheme in ['D-SGD', 'G', 'ClippedGossip', 'S', 'AS', 'global']")[["scheme", "corrupt_fraction_exp", "recall"]]
+# )
+
 color_map = {
     "D-SGD": "#e6194B",
     "D-PSGD": "#800000",
@@ -62,7 +96,7 @@ color_map = {
     "global": "gold"
 }
 
-fig, axes = plt.subplots(1, 2)
+fig, axes = plt.subplots(2, 2, sharex = True, figsize = (12, 8), constrained_layout = True)
 
 sns.lineplot(
     data = F1_out,
@@ -71,7 +105,7 @@ sns.lineplot(
     hue = "scheme",
     palette = color_map,
     errorbar = "se",
-    ax = axes[0]
+    ax = axes[0, 0]
 )
 
 sns.lineplot(
@@ -81,23 +115,48 @@ sns.lineplot(
     hue = "scheme",
     palette = color_map,
     errorbar = "se",
-    ax = axes[1]
+    ax = axes[0, 1]
 )
 
-for ax in axes:
-    ax.legend_.remove()
+sns.lineplot(
+    data = precision_out,
+    x = "corrupt_fraction_exp",
+    y = "precision",
+    hue = "scheme",
+    palette = color_map,
+    errorbar = "se",
+    ax = axes[1, 0]
+)
+
+sns.lineplot(
+    data = recall_out,
+    x = "corrupt_fraction_exp",
+    y = "recall",
+    hue = "scheme",
+    palette = color_map,
+    errorbar = "se",
+    ax = axes[1, 1]
+)
+
+for i in range(2):
+    for j in range(2):
+        axes[i, j].legend_.remove()
     
-handles, labels = axes[0].get_legend_handles_labels()
+handles, labels = axes[0, 0].get_legend_handles_labels()
     
 labels = ["D-SGD", "D-PSGD", "G (local)", "ClippedGossip", "AG", "A,G", "G,A", "S", "AS", "G (global)"]
+# labels = ["D-SGD", "G (local)", "ClippedGossip", "S", "AS", "G (global)"]
     
-fig.legend(handles, labels, loc = "center left", bbox_to_anchor = (1, 0.5))
+fig.legend(handles, labels, loc = "lower center", ncol = 5, bbox_to_anchor = (0.5, -0.05))
+# fig.legend(handles, labels, loc = "lower center", ncol = 6, bbox_to_anchor = (0.5, -0.025))
 
-axes[0].set_xlabel(r"$p_\text{flip}$")
-axes[1].set_xlabel(r"$p_\text{flip}$")
-axes[1].set_ylabel("Relative Norm")
+axes[0, 0].set_xlabel(r"$p_\text{flip}$")
+axes[0, 1].set_xlabel(r"$p_\text{flip}$")
+axes[1, 0].set_xlabel(r"$p_\text{flip}$")
+axes[1, 1].set_xlabel(r"$p_\text{flip}$")
+axes[0, 1].set_ylabel("relative norm")
 fig.suptitle("Experiment 2: Effect of Byzantine Flip Proportion")
 
-fig.subplots_adjust(wspace=0.3)
+fig.subplots_adjust(bottom = 0.12)
 
 plt.tight_layout()

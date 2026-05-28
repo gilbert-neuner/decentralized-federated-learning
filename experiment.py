@@ -2,7 +2,7 @@ import numpy as np
 import random
 from communication_network import Communication_Network
 from generate_data import generate_beta_true, generate_X_Y, generate_adj_mtx
-from diagnostic import confusion_matrix, F1, rel_norm
+from diagnostic import confusion_matrix, F1, rel_norm, precision, recall
 import pandas as pd
             
 # data_params: n, p, SNR, sparsity
@@ -65,6 +65,8 @@ def replicate_algorithm(data_params = {}, topology_params = {}, algorithm_params
         new_row["seed"] = [replicate + seed]
         new_row["client_id"] = [comm_graph.comm_graph[k].client_id]
         new_row["F1"] = [F1(confusion_matrix(beta_true, comm_graph.comm_graph[k].beta_curr))]
+        new_row["precision"] = [precision(confusion_matrix(beta_true, comm_graph.comm_graph[k].beta_curr))]
+        new_row["recall"] = [recall(confusion_matrix(beta_true, comm_graph.comm_graph[k].beta_curr))]
         new_row["beta_rel_norm"] = [rel_norm(beta_true, comm_graph.comm_graph[k].beta_curr)]
         new_row["Y_rel_norm"] = [rel_norm(comm_graph.comm_graph[k].Y, comm_graph.comm_graph[k].X @ comm_graph.comm_graph[k].beta_curr)]
         new_row = pd.DataFrame(new_row)
