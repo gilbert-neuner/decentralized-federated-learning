@@ -1,5 +1,4 @@
 Repository for my PhD research on decentralized federated learning
-
-February: submitted Written Qualifying Exam
-
-For the overarching framework, see roadmap.pdf
+July 2026: advanced to candidacy
+May 2026: took Oral Qualifying Exam
+February 2025: submitted Written Qualifying Exam
